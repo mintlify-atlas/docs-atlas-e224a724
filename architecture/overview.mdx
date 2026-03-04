@@ -1,0 +1,186 @@
+---
+title: Architecture Overview
+description: High-level architecture and design principles of NetBird
+---
+
+NetBird is a peer-to-peer VPN built on top of WireGuard that uses WebRTC ICE for NAT traversal and automatic peer discovery. The architecture is designed to establish direct, encrypted connections between peers whenever possible, falling back to relay servers when necessary.
+
+## Design Philosophy
+
+NetBird's architecture is built on several core principles:
+
+### Zero Configuration
+
+Peers automatically discover each other and establish connections without manual configuration of ports, firewall rules, or VPN gateways. The system handles:
+
+- Automatic IP address assignment
+- Peer discovery through the management service
+- NAT traversal using STUN/TURN servers
+- Dynamic network topology updates
+
+### Peer-to-Peer First
+
+Direct peer-to-peer connections are always preferred over relay connections for optimal performance:
+
+1. **WebRTC ICE** is used to discover connection candidates and establish direct paths
+2. **STUN servers** help peers discover their public endpoints
+3. **Relay servers (TURN)** are used only when direct connection fails
+4. **WireGuard** provides the actual encrypted tunnel once a path is established
+
+### Centralized Control, Distributed Data
+
+While the Management Service maintains network state and access policies, actual data flows directly between peers:
+
+- **Management Service**: Centralized control plane for authentication, authorization, and network configuration
+- **Signal Service**: Facilitates WebRTC signaling for peer connection negotiation
+- **Data Plane**: Fully distributed peer-to-peer WireGuard tunnels
+
+## High-Level Architecture
+
+<Frame>
+  <img src="https://docs.netbird.io/docs-static/img/about-netbird/high-level-dia.png" alt="NetBird Architecture Diagram" />
+</Frame>
+
+The NetBird network consists of four main components:
+
+### 1. NetBird Client (Agent)
+
+Runs on each machine in the network. Key responsibilities:
+
+- Manages local WireGuard interface
+- Connects to Management and Signal services
+- Performs ICE candidate discovery via STUN servers
+- Establishes and maintains peer connections
+- Applies network policies (ACLs, routes, DNS)
+
+### 2. Management Service
+
+The control plane that orchestrates the network:
+
+- Authenticates peers using SSO or setup keys
+- Maintains the network map (which peers can connect to each other)
+- Distributes peer configurations and network updates
+- Manages access control policies and routing rules
+- Stores network state and configuration
+
+### 3. Signal Service
+
+Facilitates the WebRTC signaling process:
+
+- Relays encrypted connection offer/answer messages between peers
+- Exchanges ICE candidates for NAT traversal
+- Does not see or store actual peer data
+- Lightweight, stateless message forwarder
+
+### 4. Relay Servers (TURN)
+
+Provide fallback connectivity when direct connection fails:
+
+- Used when peers are behind strict NATs or firewalls
+- Relay encrypted WireGuard traffic between peers
+- Only see encrypted packets (end-to-end encryption maintained)
+- NetBird uses [Coturn](https://github.com/coturn/coturn) for STUN/TURN functionality
+
+## Connection Flow
+
+```mermaid
+sequenceDiagram
+    participant P1 as Peer 1 (Client)
+    participant M as Management Service
+    participant S as Signal Service
+    participant P2 as Peer 2 (Client)
+    participant STUN as STUN Server
+    
+    P1->>M: Authenticate & Register
+    P2->>M: Authenticate & Register
+    M->>P1: Network Map (list of peers)
+    M->>P2: Network Map (list of peers)
+    
+    P1->>STUN: Discover public endpoints
+    P2->>STUN: Discover public endpoints
+    
+    P1->>S: Send encrypted offer with ICE candidates
+    S->>P2: Forward offer
+    P2->>S: Send encrypted answer with ICE candidates
+    S->>P1: Forward answer
+    
+    P1<-->P2: ICE connectivity checks
+    P1<-->P2: Direct WireGuard tunnel established
+```
+
+## Network Map Distribution
+
+The Management Service maintains a "network map" for each account, which defines:
+
+- **Peers**: All machines in the network with their public keys and metadata
+- **Access Policies**: Which peers are allowed to connect to each other
+- **Routes**: Network routes that should be applied
+- **DNS Configuration**: Custom DNS zones and nameservers
+- **Firewall Rules**: Traffic filtering rules
+
+Whenever the network topology changes, the Management Service pushes updates to affected peers in real-time through a streaming gRPC connection.
+
+## Security Architecture
+
+### Multiple Layers of Encryption
+
+1. **WireGuard Encryption**: All peer-to-peer traffic is encrypted using WireGuard's Noise protocol
+2. **Signaling Encryption**: WebRTC offers/answers are encrypted before being sent through Signal service
+3. **TLS**: All connections to Management and Signal services use TLS
+
+### Zero-Trust Model
+
+- Each peer has its own WireGuard key pair
+- Peer authentication happens through SSO or setup keys
+- Access control policies are enforced at the peer level
+- No implicit trust between peers
+
+### Optional Quantum Resistance
+
+NetBird supports [Rosenpass](https://rosenpass.eu/) for post-quantum secure key exchange:
+
+- Provides quantum-resistant pre-shared keys for WireGuard
+- Can run in permissive mode (fallback to WireGuard-only) or strict mode
+- Enhances security for long-term protection
+
+## Scalability Considerations
+
+### Horizontal Scaling
+
+- Management and Signal services can be scaled horizontally
+- Relay servers can be distributed geographically
+- Network state can be stored in distributed databases
+
+### Efficient Updates
+
+- Only affected peers receive updates when network topology changes
+- Incremental updates reduce bandwidth and processing overhead
+- Serial numbers prevent processing outdated configurations
+
+### Resource Efficiency
+
+- Kernel WireGuard implementation minimizes CPU overhead
+- Direct peer connections eliminate relay server load when possible
+- eBPF-based packet filtering reduces kernel overhead
+
+## Platform Support
+
+NetBird runs on:
+
+- **Desktop**: Linux, macOS, Windows
+- **Mobile**: iOS, Android
+- **Embedded**: OpenWRT, serverless environments
+- **Containers**: Docker with host or container networking modes
+
+Each platform uses the same core architecture but may have platform-specific implementations for network interface management and system integration.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="How It Works" icon="gears" href="/architecture/how-it-works">
+    Detailed connection flow and NAT traversal process
+  </Card>
+  <Card title="Components" icon="cubes" href="/architecture/components">
+    Deep dive into each architectural component
+  </Card>
+</CardGroup>

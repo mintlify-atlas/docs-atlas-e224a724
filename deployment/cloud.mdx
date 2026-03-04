@@ -1,0 +1,390 @@
+---
+title: NetBird Cloud vs Self-Hosted
+description: Compare NetBird Cloud and self-hosted deployment options to choose the right solution
+---
+
+NetBird offers two deployment models: a fully managed cloud service and self-hosted infrastructure. This guide helps you understand the differences and choose the right option for your use case.
+
+## NetBird Cloud
+
+NetBird Cloud is a fully managed service hosted by the NetBird team at [app.netbird.io](https://app.netbird.io).
+
+### Key Features
+
+- **Zero infrastructure management** - No servers to maintain or update
+- **Instant setup** - Sign up and connect devices in minutes
+- **Automatic updates** - Always running the latest version
+- **High availability** - 99.9% uptime SLA on paid plans
+- **Global presence** - STUN/TURN servers in multiple regions
+- **Built-in identity provider** - No need to configure OAuth
+- **Managed scaling** - Automatically handles growth
+- **Professional support** - Direct support from NetBird team
+
+### How It Works
+
+1. **Sign up** at [app.netbird.io](https://app.netbird.io)
+2. **Authenticate** using Google, Microsoft, GitHub, or email
+3. **Install clients** on your devices
+4. **Connect** - Devices automatically join your network
+
+No server configuration, domain names, or TLS certificates required.
+
+### Pricing Tiers
+
+NetBird Cloud offers multiple pricing tiers:
+
+- **Free** - Up to 5 users, unlimited peers
+- **Personal** - For individuals and small teams
+- **Team** - Advanced features and higher limits
+- **Enterprise** - Custom pricing with SLA and dedicated support
+
+See [netbird.io/pricing](https://netbird.io/pricing) for current pricing and feature comparison.
+
+### Data Privacy
+
+With NetBird Cloud:
+
+- **Peer metadata** is stored on NetBird's infrastructure (peer names, IP addresses, access policies)
+- **User data** flows through your chosen identity provider (Google, Microsoft, etc.)
+- **Network traffic** is end-to-end encrypted and **never** passes through NetBird servers
+- **Peer-to-peer connections** are direct between your devices using WireGuard
+
+<Note>
+NetBird uses a zero-trust architecture where the control plane (management) is separate from the data plane (peer connections). Your actual network traffic never touches NetBird's cloud infrastructure.
+</Note>
+
+### When to Choose Cloud
+
+NetBird Cloud is ideal for:
+
+- **Quick deployment** - Need to get started immediately
+- **Small to medium teams** - Up to 100 users
+- **No DevOps resources** - No one to manage infrastructure
+- **Multi-region teams** - Benefit from global STUN/TURN servers
+- **Testing and evaluation** - Try before committing to self-hosting
+- **Managed services preference** - Focus on using NetBird, not running it
+
+## Self-Hosted NetBird
+
+Self-hosted NetBird runs on your own infrastructure, giving you complete control over the deployment.
+
+### Key Features
+
+- **Full control** - Own all data and infrastructure
+- **On-premises deployment** - Keep everything within your network
+- **Custom identity providers** - Integrate with existing SSO (Keycloak, Auth0, Azure AD, etc.)
+- **Air-gapped environments** - No internet dependency after setup
+- **Custom compliance** - Meet specific regulatory requirements
+- **No subscription costs** - Only infrastructure costs
+- **Open source** - BSD-3-Clause license (management, signal, relay are AGPL-3.0)
+
+### Deployment Requirements
+
+#### Infrastructure
+
+- **VM Specs**: 1 CPU, 2GB RAM minimum
+- **Storage**: 5GB+ for database and logs
+- **Network**: Public IP with ports 80, 443 (TCP) and 3478 (UDP) accessible
+- **Domain**: Public domain name for TLS certificates
+
+#### Software
+
+- **Docker** with docker-compose plugin
+- **Linux** - Ubuntu, Debian, RHEL, or similar
+- **Utilities** - jq, curl for setup script
+
+#### Operational
+
+- **System administration** - Ability to manage Linux servers
+- **TLS management** - Understanding of certificates (automated with Let's Encrypt)
+- **Backup strategy** - Regular backups of configuration and database
+- **Update management** - Monitoring and applying updates
+- **Monitoring** - Optional but recommended for production
+
+### Deployment Methods
+
+<CardGroup cols={2}>
+  <Card title="Docker Compose" icon="docker" href="/deployment/docker-compose">
+    Recommended: Automated setup with getting-started.sh script
+  </Card>
+  <Card title="Kubernetes" icon="dharmachakra" href="/deployment/kubernetes">
+    For container orchestration environments
+  </Card>
+</CardGroup>
+
+### Architecture Components
+
+A self-hosted deployment includes:
+
+| Component | Purpose | Resource Usage |
+|-----------|---------|----------------|
+| **NetBird Server** | Combined management, signal, relay, STUN | 512MB-2GB RAM |
+| **Dashboard** | Web UI for administration | 128MB-512MB RAM |
+| **Database** | SQLite (default) or PostgreSQL/MySQL | Minimal-Moderate |
+| **Reverse Proxy** | Traefik, Nginx, Caddy, or similar | 128MB-256MB RAM |
+| **Identity Provider** | Embedded (Dex) or external | Varies |
+
+<Accordion title="What's the 'combined server'?">
+Starting with recent versions, NetBird consolidated multiple services (management, signal, relay) into a single container called `netbird-server`. This simplifies deployment and reduces resource usage compared to running separate containers.
+</Accordion>
+
+### Data Sovereignty
+
+With self-hosted NetBird:
+
+- **All data stays** on your infrastructure
+- **No external calls** to NetBird's servers (except optional anonymous metrics)
+- **Custom data retention** policies
+- **GDPR/HIPAA compliance** - Meet specific regulatory requirements
+- **Audit trails** - Full control over logging and monitoring
+
+### When to Choose Self-Hosted
+
+Self-hosted is ideal for:
+
+- **Regulatory compliance** - HIPAA, GDPR, industry-specific requirements
+- **Data sovereignty** - Government, finance, healthcare sectors
+- **Large deployments** - 100+ users or 1000+ peers
+- **Air-gapped networks** - No internet connectivity required
+- **Custom integrations** - Need to integrate with existing systems
+- **Enterprise SSO** - Already using Okta, Azure AD, Keycloak, etc.
+- **Cost optimization** - High peer count makes self-hosting cheaper
+- **Full control** - Want complete ownership of infrastructure
+
+## Feature Comparison
+
+| Feature | NetBird Cloud | Self-Hosted |
+|---------|---------------|-------------|
+| **Setup time** | 5 minutes | 30-60 minutes |
+| **Infrastructure** | None required | VM + domain required |
+| **Updates** | Automatic | Manual (docker pull) |
+| **Scaling** | Automatic | Manual configuration |
+| **Identity provider** | Built-in | Embedded or custom |
+| **Data location** | NetBird servers | Your infrastructure |
+| **Uptime SLA** | 99.9% (paid plans) | Your responsibility |
+| **Support** | Included (paid plans) | Community or commercial |
+| **Cost model** | Per-user subscription | Infrastructure costs |
+| **Air-gap support** | No | Yes |
+| **Custom branding** | Enterprise only | Yes (modify dashboard) |
+| **API access** | Yes | Yes |
+| **Peer-to-peer encryption** | Yes | Yes |
+| **STUN/TURN servers** | Global network | Your infrastructure |
+
+## Cost Comparison
+
+### NetBird Cloud Costs
+
+- **Free tier**: $0 for up to 5 users
+- **Personal**: ~$4/user/month
+- **Team**: ~$12/user/month
+- **Enterprise**: Custom pricing
+
+*Prices are approximate - check [netbird.io/pricing](https://netbird.io/pricing) for current rates*
+
+### Self-Hosted Costs
+
+#### Small Deployment (10-50 users)
+
+- **VM**: $10-30/month (cloud provider dependent)
+- **Domain**: $10-15/year
+- **Storage**: Included in VM
+- **TLS certs**: Free (Let's Encrypt)
+- **Total**: ~$15-35/month
+
+#### Medium Deployment (50-200 users)
+
+- **VM**: $40-100/month (higher specs)
+- **External database**: $20-50/month (optional PostgreSQL)
+- **Monitoring**: $10-20/month (optional)
+- **Backups**: $5-10/month
+- **Total**: ~$75-180/month
+
+#### Large Deployment (200+ users)
+
+- **Multiple VMs**: $200-500/month (HA setup)
+- **Managed database**: $100-300/month
+- **Load balancer**: $20-50/month
+- **Monitoring/logging**: $50-100/month
+- **Total**: ~$370-950/month
+
+<Note>
+Break-even point is typically around 20-30 users, depending on your cloud provider and required availability. Above this, self-hosting can be more cost-effective.
+</Note>
+
+## Operational Responsibilities
+
+### NetBird Cloud
+
+**You manage:**
+- Client installation on devices
+- Access policies and network configuration
+- User onboarding
+
+**NetBird manages:**
+- Infrastructure maintenance
+- Security updates
+- Scaling and performance
+- Backups and disaster recovery
+- Monitoring and alerting
+
+### Self-Hosted
+
+**You manage:**
+- Infrastructure provisioning
+- OS and Docker updates
+- NetBird version updates
+- TLS certificate renewal (automated with Let's Encrypt)
+- Database backups
+- Monitoring and alerting
+- Security hardening
+- Disaster recovery
+- Scaling and performance tuning
+- Client installation on devices
+- Access policies and network configuration
+- User onboarding
+
+## Migration Between Options
+
+### Cloud to Self-Hosted
+
+You can migrate from NetBird Cloud to self-hosted:
+
+1. Export access policies and network configuration (manual)
+2. Set up self-hosted infrastructure
+3. Re-register peers with new management server
+4. Reconfigure access policies
+
+<Warning>
+There is no automated migration tool. Peers must be re-registered, and policies must be manually recreated.
+</Warning>
+
+### Self-Hosted to Cloud
+
+Similarly, you can migrate to NetBird Cloud:
+
+1. Sign up for NetBird Cloud account
+2. Uninstall old clients or reset connection
+3. Install clients with Cloud setup key
+4. Recreate access policies in Cloud dashboard
+
+## Decision Matrix
+
+<Steps>
+  <Step title="Answer these questions">
+    - Do you have compliance requirements for data sovereignty? (Yes → Self-hosted)
+    - Do you have DevOps/SysAdmin resources? (No → Cloud)
+    - Do you need more than 100 users? (Yes → Consider self-hosted for cost)
+    - Do you need air-gapped deployment? (Yes → Self-hosted)
+    - Do you want zero infrastructure management? (Yes → Cloud)
+  </Step>
+  
+  <Step title="Evaluate costs">
+    - Calculate per-user cost for Cloud
+    - Estimate infrastructure + time cost for self-hosted
+    - Compare break-even point
+  </Step>
+  
+  <Step title="Consider operations">
+    - Do you have capacity for system administration?
+    - Can you handle security updates and patches?
+    - Do you need 24/7 availability?
+  </Step>
+  
+  <Step title="Choose deployment model">
+    - **Cloud**: Fast setup, low operational overhead
+    - **Self-hosted**: Full control, data sovereignty
+  </Step>
+</Steps>
+
+## Hybrid Approach
+
+Some organizations use a hybrid model:
+
+- **Development/testing**: NetBird Cloud for quick iteration
+- **Production**: Self-hosted for compliance and control
+- **Multi-tenant**: Cloud for external partners, self-hosted for internal
+
+## Getting Started
+
+### Start with Cloud
+
+```bash
+# No installation needed
+# Visit app.netbird.io and sign up
+```
+
+1. Go to [app.netbird.io](https://app.netbird.io)
+2. Sign up with Google, Microsoft, GitHub, or email
+3. Download and install clients
+4. Connect devices
+
+### Start with Self-Hosted
+
+```bash
+export NETBIRD_DOMAIN=netbird.example.com
+curl -fsSL https://github.com/netbirdio/netbird/releases/latest/download/getting-started.sh | bash
+```
+
+See [Docker Compose Deployment](/deployment/docker-compose) for detailed instructions.
+
+## Support Options
+
+### NetBird Cloud
+
+- **Community forum** (all tiers)
+- **Email support** (paid tiers)
+- **Priority support** (Enterprise tier)
+- **Slack channel** (all tiers)
+
+### Self-Hosted
+
+- **Community forum** - Free community support
+- **GitHub Issues** - Bug reports and feature requests
+- **Slack channel** - Community chat
+- **Commercial support** - Available from NetBird team
+- **Documentation** - Comprehensive self-service docs
+
+## Frequently Asked Questions
+
+<AccordionGroup>
+  <Accordion title="Can I switch from Cloud to self-hosted later?">
+    Yes, but there's no automated migration. You'll need to re-register peers and manually recreate access policies.
+  </Accordion>
+  
+  <Accordion title="Is my traffic encrypted with NetBird Cloud?">
+    Yes. NetBird uses end-to-end WireGuard encryption. Your network traffic never passes through NetBird's servers - connections are peer-to-peer.
+  </Accordion>
+  
+  <Accordion title="Do I need a public IP for self-hosted?">
+    Yes, your server needs to be publicly accessible on ports 80, 443 (TCP) and 3478 (UDP) for clients to connect.
+  </Accordion>
+  
+  <Accordion title="Can self-hosted use external identity providers?">
+    Yes. NetBird supports Auth0, Keycloak, Azure AD, Google Workspace, Okta, Zitadel, and any OIDC-compliant provider.
+  </Accordion>
+  
+  <Accordion title="What's the performance difference?">
+    Peer-to-peer connections have identical performance. Only the signaling phase (connection establishment) goes through the management server, which is typically less than 1 second regardless of deployment model.
+  </Accordion>
+  
+  <Accordion title="Can I run self-hosted without internet access?">
+    Yes, for air-gapped networks. All components can run offline, though you'll need to handle TLS certificates manually and peers must be able to reach your server.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Try NetBird Cloud" icon="cloud" href="https://app.netbird.io">
+    Sign up for free and connect your first devices
+  </Card>
+  <Card title="Self-Hosted Setup" icon="server" href="/deployment/docker-compose">
+    Deploy NetBird on your infrastructure
+  </Card>
+  <Card title="Feature Comparison" icon="table" href="https://netbird.io/pricing">
+    Compare all features and pricing tiers
+  </Card>
+  <Card title="Architecture Deep Dive" icon="sitemap" href="/architecture/how-it-works">
+    Learn how NetBird works under the hood
+  </Card>
+</CardGroup>

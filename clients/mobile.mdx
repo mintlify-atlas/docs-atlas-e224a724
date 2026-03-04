@@ -1,0 +1,358 @@
+---
+title: Mobile Clients (iOS & Android)
+description: Install and configure NetBird on mobile devices
+---
+
+NetBird provides native mobile applications for iOS and Android, enabling secure mesh networking on your mobile devices.
+
+## Installation
+
+<Tabs>
+  <Tab title="iOS">
+    ### Download from App Store
+
+    Install NetBird from the Apple App Store:
+
+    <Card title="NetBird for iOS" icon="apple" href="https://apps.apple.com/app/netbird">
+      Download from the App Store
+    </Card>
+
+    ### Requirements
+
+    - iOS 15.0 or later
+    - iPhone, iPad, or iPod touch
+
+    ### Installation Steps
+
+    <Steps>
+      <Step title="Download the app">
+        Search for "NetBird" in the App Store or use the link above.
+      </Step>
+
+      <Step title="Install and launch">
+        Tap **Get** to install, then open the app.
+      </Step>
+
+      <Step title="Grant VPN permissions">
+        iOS will ask for permission to add VPN configurations. Tap **Allow**.
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Android">
+    ### Download from Google Play
+
+    Install NetBird from Google Play Store:
+
+    <Card title="NetBird for Android" icon="android" href="https://play.google.com/store/apps/details?id=io.netbird.client">
+      Download from Google Play
+    </Card>
+
+    ### Requirements
+
+    - Android 7.0 (Nougat) or later
+    - WireGuard support (kernel or userspace)
+
+    ### Installation Steps
+
+    <Steps>
+      <Step title="Download the app">
+        Search for "NetBird" in Google Play Store or use the link above.
+      </Step>
+
+      <Step title="Install and launch">
+        Tap **Install**, then open the app.
+      </Step>
+
+      <Step title="Grant VPN permissions">
+        Android will ask for permission to create VPN connections. Tap **OK**.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Initial Setup
+
+<Steps>
+  <Step title="Launch NetBird">
+    Open the NetBird app on your mobile device.
+  </Step>
+
+  <Step title="Choose authentication method">
+    <Tabs>
+      <Tab title="SSO Login">
+        1. Tap **Sign in with SSO**
+        2. Choose your identity provider (Google, Microsoft, GitHub, etc.)
+        3. Complete the authentication in your browser
+        4. Return to the NetBird app
+      </Tab>
+
+      <Tab title="Setup Key">
+        1. Tap **Use Setup Key**
+        2. Enter your setup key obtained from the NetBird dashboard
+        3. (Optional) Enter your management URL if using self-hosted NetBird
+        4. Tap **Connect**
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Connect to your network">
+    - Tap the **Connect** button
+    - Grant VPN permissions if prompted
+    - Wait for the connection to establish
+  </Step>
+
+  <Step title="Verify connection">
+    Once connected, you'll see:
+    - Your NetBird IP address
+    - Connection status (Connected)
+    - List of available peers
+    - Network traffic statistics
+  </Step>
+</Steps>
+
+## App Features
+
+### Dashboard
+
+The main screen displays:
+- **Connection status**: Connected, Disconnected, or Connecting
+- **NetBird IP**: Your assigned mesh network IP (e.g., 100.x.x.x)
+- **Data transfer**: Upload/download statistics
+- **Connected peers**: List of active peer connections
+
+### Peer List
+
+View and interact with peers:
+- See all peers in your network
+- Check peer connection status (Direct/Relayed)
+- View peer IP addresses and hostnames
+- Monitor peer connection quality
+
+### Settings
+
+Access app settings:
+- **Auto-connect**: Automatically connect on app launch
+- **Always-on VPN**: Keep NetBird running in the background
+- **Management URL**: Change management server (for self-hosted)
+- **Notifications**: Configure connection notifications
+- **Debug logs**: Enable detailed logging for troubleshooting
+
+## Mobile-Specific Considerations
+
+### Battery Optimization
+
+<Tabs>
+  <Tab title="iOS">
+    iOS manages VPN connections efficiently, but you can optimize battery life:
+
+    - **Background refresh**: NetBird uses VPN APIs that allow background connectivity without significant battery drain
+    - **Low Power Mode**: NetBird continues to work in Low Power Mode but may experience reduced performance
+
+    To ensure NetBird stays connected:
+    1. Go to **Settings → NetBird**
+    2. Enable **Background App Refresh**
+  </Tab>
+
+  <Tab title="Android">
+    Android's battery optimization may interfere with NetBird:
+
+    <Steps>
+      <Step title="Disable battery optimization">
+        1. Go to **Settings → Apps → NetBird**
+        2. Tap **Battery**
+        3. Select **Unrestricted**
+      </Step>
+
+      <Step title="Enable always-on VPN (optional)">
+        1. Go to **Settings → Network & Internet → VPN**
+        2. Tap the settings icon next to NetBird
+        3. Enable **Always-on VPN**
+        4. Enable **Block connections without VPN** (optional)
+      </Step>
+    </Steps>
+
+    <Note>
+      Different Android manufacturers (Samsung, Xiaomi, Huawei) have additional battery optimization settings. Check your device's specific battery settings.
+    </Note>
+  </Tab>
+</Tabs>
+
+### Network Connectivity
+
+**Mobile Carrier NAT**
+
+Mobile carriers often use carrier-grade NAT (CGNAT), which can make direct peer-to-peer connections difficult. NetBird automatically:
+- Attempts direct connection first
+- Falls back to relay servers (TURN) when direct connection fails
+- Maintains secure encryption regardless of connection type
+
+**Network Switching**
+
+NetBird handles network transitions smoothly:
+- Wi-Fi ↔ Mobile data switching
+- Roaming between cell towers
+- Reconnection after network loss
+
+### Data Usage
+
+Monitor NetBird's data consumption:
+
+<Tabs>
+  <Tab title="iOS">
+    1. Go to **Settings → Cellular**
+    2. Scroll down to **NetBird**
+    3. View current period data usage
+  </Tab>
+
+  <Tab title="Android">
+    1. Go to **Settings → Network & Internet → Data usage**
+    2. Tap **App data usage**
+    3. Find **NetBird** in the list
+  </Tab>
+</Tabs>
+
+<Note>
+  NetBird only transfers data when you access resources through the mesh network. Background keep-alive traffic is minimal.
+</Note>
+
+## Configuration
+
+### Management URL (Self-Hosted)
+
+If you're using a self-hosted NetBird instance:
+
+1. Open NetBird app
+2. Tap **Settings** (or gear icon)
+3. Tap **Management URL**
+4. Enter your custom management server URL
+5. Tap **Save**
+6. Reconnect to apply changes
+
+### Custom Hostname
+
+Set a custom device name:
+
+1. Open **Settings**
+2. Tap **Device Name** or **Hostname**
+3. Enter your preferred name (e.g., "John's iPhone")
+4. Save and reconnect
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Cannot connect to peers">
+    **Check network permissions:**
+    - Ensure VPN permissions are granted
+    - Check if NetBird is allowed through firewall (if using VPN/Firewall apps)
+
+    **Verify connection:**
+    - Disconnect and reconnect
+    - Check peer status in the app
+    - Ensure peers are online
+
+    **Mobile network issues:**
+    - Mobile carrier NAT may require relay connections
+    - Check if you see "Relayed" connection type (this is normal)
+  </Accordion>
+
+  <Accordion title="VPN permission errors">
+    **iOS:**
+    1. Go to **Settings → General → VPN & Device Management**
+    2. Remove any existing NetBird VPN configurations
+    3. Reopen NetBird and grant permissions again
+
+    **Android:**
+    1. Go to **Settings → Network & Internet → VPN**
+    2. Remove NetBird configuration
+    3. Reopen NetBird and grant permissions again
+  </Accordion>
+
+  <Accordion title="App keeps disconnecting">
+    **iOS:**
+    - Enable **Background App Refresh** for NetBird
+    - Check if Low Power Mode is affecting connectivity
+
+    **Android:**
+    - Disable battery optimization for NetBird
+    - Enable **Always-on VPN** in Android settings
+    - Check manufacturer-specific battery settings (Samsung, Xiaomi, etc.)
+  </Accordion>
+
+  <Accordion title="High battery drain">
+    - Check if you're connected to many peers
+    - Reduce background refresh frequency
+    - Consider using auto-connect only on Wi-Fi
+    - Check for app updates (newer versions may improve efficiency)
+  </Accordion>
+
+  <Accordion title="SSO login fails">
+    - Ensure you have a stable internet connection
+    - Try using a setup key instead
+    - Clear app cache and try again
+    - Check if your browser blocks pop-ups
+  </Accordion>
+
+  <Accordion title="Cannot access local network resources">
+    - Verify DNS settings in NetBird dashboard
+    - Check if routes are properly configured on management server
+    - Ensure target resources allow connections from your NetBird IP
+  </Accordion>
+</AccordionGroup>
+
+### Enable Debug Logs
+
+<Tabs>
+  <Tab title="iOS">
+    1. Open NetBird app
+    2. Go to **Settings**
+    3. Enable **Debug Logging**
+    4. Reproduce the issue
+    5. Share logs from **Settings → Share Logs**
+  </Tab>
+
+  <Tab title="Android">
+    1. Open NetBird app
+    2. Go to **Settings**
+    3. Enable **Debug Mode** or **Verbose Logging**
+    4. Reproduce the issue
+    5. Share logs from **Settings → Export Logs**
+  </Tab>
+</Tabs>
+
+## Limitations
+
+Mobile clients have some limitations compared to desktop clients:
+
+- **SSH access**: Mobile apps don't support SSH server functionality
+- **Network routing**: Cannot act as routing peers (gateway/exit nodes)
+- **Custom DNS resolvers**: Limited DNS configuration options
+- **Kernel WireGuard**: iOS always uses userspace WireGuard; Android may use kernel or userspace depending on device
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Setup Keys" icon="key">
+    For easier onboarding, use setup keys instead of SSO on mobile devices.
+  </Card>
+
+  <Card title="Enable Auto-Connect" icon="plug">
+    Configure auto-connect to ensure your device is always protected.
+  </Card>
+
+  <Card title="Monitor Data Usage" icon="chart-line">
+    Keep an eye on data consumption, especially on mobile networks.
+  </Card>
+
+  <Card title="Update Regularly" icon="arrow-up">
+    Keep the app updated for the latest features and security patches.
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+If you encounter issues not covered here:
+
+- Check the [NetBird Community Forum](https://forum.netbird.io)
+- Join the [NetBird Slack](https://docs.netbird.io/slack-url)
+- Report bugs on [GitHub Issues](https://github.com/netbirdio/netbird/issues)

@@ -1,0 +1,502 @@
+---
+title: Docker Compose Deployment
+description: Deploy NetBird using Docker Compose with the automated getting-started script
+---
+
+The fastest way to deploy NetBird is using Docker Compose with the automated getting-started script. This method sets up all required services with a single command.
+
+## Prerequisites
+
+Before starting, ensure you have:
+
+<Steps>
+  <Step title="Linux Server">
+    A Linux VM with at least **1 CPU** and **2GB RAM**. The server must be publicly accessible on:
+    - TCP ports **80** and **443** (HTTPS)
+    - UDP port **3478** (STUN)
+  </Step>
+  
+  <Step title="Domain Name">
+    A public domain name pointing to your server's IP address (e.g., `netbird.example.com`)
+  </Step>
+  
+  <Step title="Docker Installed">
+    Install Docker with docker-compose plugin:
+    
+    ```bash
+    # Install Docker (Ubuntu/Debian)
+    curl -fsSL https://get.docker.com | sh
+    
+    # Verify installation
+    docker --version
+    docker compose version
+    ```
+  </Step>
+  
+  <Step title="Required Utilities">
+    Install jq and curl:
+    
+    ```bash
+    # Debian/Ubuntu
+    sudo apt update && sudo apt install jq curl
+    
+    # RHEL/CentOS
+    sudo yum install jq curl
+    ```
+  </Step>
+</Steps>
+
+## Quick Start (Recommended)
+
+The **getting-started.sh** script automates the entire deployment process:
+
+```bash
+export NETBIRD_DOMAIN=netbird.example.com
+curl -fsSL https://github.com/netbirdio/netbird/releases/latest/download/getting-started.sh | bash
+```
+
+### What the Script Does
+
+The script will:
+
+1. **Validate requirements** - Check for Docker, jq, and curl
+2. **Prompt for configuration** - Ask about reverse proxy preferences
+3. **Generate configurations** - Create docker-compose.yml, config.yaml, and dashboard.env
+4. **Generate secrets** - Create encryption keys and relay auth secrets
+5. **Start services** - Launch all containers with proper networking
+6. **Configure TLS** - Set up automatic HTTPS via Let's Encrypt (with Traefik)
+
+<Note>
+The entire process takes about 2-3 minutes. You'll be able to access the dashboard immediately after completion.
+</Note>
+
+## Interactive Setup Process
+
+### Step 1: Domain Configuration
+
+If `NETBIRD_DOMAIN` is not set, the script will prompt:
+
+```bash
+Enter the domain you want to use for NetBird (e.g. netbird.my-domain.com): 
+```
+
+<Warning>
+Do not use `netbird.example.com` or `localhost`. You need a real domain name pointing to your server.
+</Warning>
+
+### Step 2: Reverse Proxy Selection
+
+Choose your reverse proxy configuration:
+
+```bash
+Which reverse proxy will you use?
+  [0] Traefik (recommended - automatic TLS, included in Docker Compose)
+  [1] Existing Traefik (labels for external Traefik instance)
+  [2] Nginx (generates config template)
+  [3] Nginx Proxy Manager (generates config + instructions)
+  [4] External Caddy (generates Caddyfile snippet)
+  [5] Other/Manual (displays setup documentation)
+
+Enter choice [0-5] (default: 0): 
+```
+
+#### Option 0: Built-in Traefik (Recommended)
+
+The simplest option - includes Traefik in the Docker Compose stack:
+
+- **Automatic TLS** via Let's Encrypt
+- **No manual certificate management**
+- **HTTP to HTTPS redirect** configured
+- **gRPC support** for signal and management services
+
+You'll be prompted for:
+
+```bash
+Enter your email for Let's Encrypt certificate notifications.
+Email address: your@email.com
+
+Do you want to enable the NetBird Proxy service?
+Enable proxy? [y/N]: 
+```
+
+<Accordion title="What is the Proxy service?">
+The NetBird Proxy allows you to selectively expose internal network resources to the internet. It's optional and can be enabled later if needed.
+
+If enabled, you'll need to:
+- Provide a separate domain (e.g., `proxy.example.com`)
+- Add a wildcard DNS record (`*.proxy.example.com`)
+- Open UDP port 51820 for WireGuard connections
+</Accordion>
+
+#### Option 1: External Traefik
+
+For integration with an existing Traefik instance:
+
+```bash
+External network (leave empty to create 'netbird' network): traefik-public
+HTTPS entrypoint name (default: websecure): 
+Certificate resolver name (e.g., letsencrypt): 
+```
+
+The script generates Docker labels for Traefik to discover services automatically.
+
+#### Options 2-4: External Proxies
+
+For Nginx, Nginx Proxy Manager, or Caddy, the script:
+
+1. Generates proxy configuration files
+2. Exposes container ports (bound to localhost or 0.0.0.0)
+3. Provides setup instructions
+
+You'll need to manually configure TLS certificates.
+
+#### Option 5: Manual/Custom
+
+Generates basic docker-compose.yml with exposed ports and displays configuration requirements.
+
+## Generated Files
+
+After running the script, you'll have:
+
+### docker-compose.yml
+
+The main orchestration file with services:
+
+```yaml
+services:
+  # Traefik reverse proxy (if using option 0)
+  traefik:
+    image: traefik:v3.6
+    ports:
+      - '443:443'
+      - '80:80'
+    # ... Traefik configuration
+
+  # NetBird Dashboard
+  dashboard:
+    image: netbirdio/dashboard:latest
+    env_file:
+      - ./dashboard.env
+    # ... Labels and networking
+
+  # Combined NetBird Server (Management + Signal + Relay + STUN)
+  netbird-server:
+    image: netbirdio/netbird-server:latest
+    ports:
+      - '3478:3478/udp'  # STUN
+    volumes:
+      - netbird_data:/var/lib/netbird
+      - ./config.yaml:/etc/netbird/config.yaml
+    # ... Labels and configuration
+
+volumes:
+  netbird_data:
+  netbird_traefik_letsencrypt:
+
+networks:
+  netbird:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+```
+
+### config.yaml
+
+Combined server configuration:
+
+```yaml
+server:
+  listenAddress: ":80"
+  exposedAddress: "https://netbird.example.com:443"
+  stunPorts:
+    - 3478
+  metricsPort: 9090
+  healthcheckAddress: ":9000"
+  logLevel: "info"
+  logFile: "console"
+  
+  authSecret: "<generated-relay-secret>"
+  dataDir: "/var/lib/netbird"
+  
+  auth:
+    issuer: "https://netbird.example.com/oauth2"
+    signKeyRefreshEnabled: true
+    dashboardRedirectURIs:
+      - "https://netbird.example.com/nb-auth"
+      - "https://netbird.example.com/nb-silent-auth"
+    cliRedirectURIs:
+      - "http://localhost:53000/"
+  
+  reverseProxy:
+    trustedHTTPProxies:
+      - "172.30.0.10/32"  # Traefik IP
+  
+  store:
+    engine: "sqlite"
+    encryptionKey: "<generated-encryption-key>"
+```
+
+<Warning>
+The `encryptionKey` encrypts sensitive data in the database. **Back up this file** - you cannot recover encrypted data without it.
+</Warning>
+
+### dashboard.env
+
+Dashboard environment variables:
+
+```bash
+# API Endpoints
+NETBIRD_MGMT_API_ENDPOINT=https://netbird.example.com
+NETBIRD_MGMT_GRPC_API_ENDPOINT=https://netbird.example.com
+
+# OAuth Configuration (Embedded IdP)
+AUTH_AUDIENCE=netbird-dashboard
+AUTH_CLIENT_ID=netbird-dashboard
+AUTH_CLIENT_SECRET=
+AUTH_AUTHORITY=https://netbird.example.com/oauth2
+USE_AUTH0=false
+AUTH_SUPPORTED_SCOPES=openid profile email groups
+AUTH_REDIRECT_URI=/nb-auth
+AUTH_SILENT_REDIRECT_URI=/nb-silent-auth
+```
+
+## Managing the Deployment
+
+### Starting Services
+
+The script starts services automatically, but you can manage them manually:
+
+```bash
+# Start all services
+docker compose up -d
+
+# Start specific service
+docker compose up -d netbird-server
+
+# View logs
+docker compose logs -f netbird-server
+
+# View all logs
+docker compose logs -f
+```
+
+### Stopping Services
+
+```bash
+# Stop all services (keeps volumes)
+docker compose down
+
+# Stop and remove volumes (deletes all data)
+docker compose down --volumes
+```
+
+<Warning>
+Using `--volumes` will delete all peer data, access policies, and user accounts. Only use this for complete reinstallation.
+</Warning>
+
+### Updating NetBird
+
+```bash
+# Pull latest images
+docker compose pull
+
+# Restart services with new images
+docker compose up -d
+```
+
+### Viewing Service Status
+
+```bash
+# Check running containers
+docker compose ps
+
+# Check resource usage
+docker stats
+
+# View logs for specific service
+docker compose logs --tail=100 netbird-server
+```
+
+## Post-Installation
+
+### Accessing the Dashboard
+
+Once services are running, access the dashboard:
+
+```
+https://netbird.example.com
+```
+
+The first access will:
+
+1. Redirect to the embedded OAuth2 provider
+2. Show the onboarding wizard
+3. Create the first admin account
+
+### Verifying Services
+
+Check that all services are healthy:
+
+```bash
+# Check server health
+curl -k https://netbird.example.com/api/health
+
+# Check OAuth configuration
+curl -k https://netbird.example.com/oauth2/.well-known/openid-configuration
+
+# Check container health
+docker compose ps
+```
+
+### Network Ports
+
+Verify required ports are accessible:
+
+```bash
+# From external machine, test HTTPS
+curl -I https://netbird.example.com
+
+# Test STUN port (from peer machine)
+netbird status
+```
+
+## Troubleshooting
+
+### Certificate Issues
+
+If Let's Encrypt certificate generation fails:
+
+```bash
+# Check Traefik logs
+docker compose logs traefik
+
+# Verify DNS resolution
+nslookup netbird.example.com
+
+# Verify port 80 and 443 are accessible
+curl -I http://netbird.example.com
+```
+
+<Note>
+Let's Encrypt requires ports 80 and 443 to be publicly accessible. Check firewall rules and DNS propagation.
+</Note>
+
+### Service Not Starting
+
+```bash
+# Check logs for errors
+docker compose logs netbird-server
+
+# Verify configuration syntax
+docker compose config
+
+# Check port conflicts
+sudo netstat -tulpn | grep -E ':(80|443|3478)\s'
+```
+
+### Database Errors
+
+```bash
+# Check volume permissions
+docker compose exec netbird-server ls -la /var/lib/netbird
+
+# Reset database (WARNING: deletes all data)
+docker compose down
+docker volume rm netbird_data
+docker compose up -d
+```
+
+### Reinitializing Setup
+
+To completely reset and reconfigure:
+
+```bash
+# Stop services and remove volumes
+docker compose down --volumes
+
+# Remove generated configuration files
+rm -f docker-compose.yml dashboard.env config.yaml \
+      proxy.env traefik-dynamic.yaml nginx-netbird.conf \
+      caddyfile-netbird.txt npm-advanced-config.txt
+
+# Run setup script again
+export NETBIRD_DOMAIN=netbird.example.com
+curl -fsSL https://github.com/netbirdio/netbird/releases/latest/download/getting-started.sh | bash
+```
+
+## Advanced Configuration
+
+### Using External Database
+
+To use PostgreSQL or MySQL instead of SQLite, edit `config.yaml`:
+
+```yaml
+server:
+  store:
+    engine: "postgres"
+    # encryptionKey is still required
+```
+
+Then set environment variable in docker-compose.yml:
+
+```yaml
+netbird-server:
+  environment:
+    - NETBIRD_STORE_ENGINE_POSTGRES_DSN=host=postgres user=netbird password=secret dbname=netbird port=5432
+```
+
+### Custom Identity Provider
+
+For advanced IdP setup (Auth0, Keycloak, Zitadel), use the alternative scripts:
+
+```bash
+# Zitadel
+curl -fsSL https://github.com/netbirdio/netbird/releases/latest/download/getting-started-with-zitadel.sh | bash
+
+# Custom IdP with configure.sh
+cp infrastructure_files/setup.env.example setup.env
+# Edit setup.env with your IdP details
+bash infrastructure_files/configure.sh
+```
+
+See [Identity Providers](/security/sso-setup) for detailed configuration.
+
+### Port Binding Options
+
+By default, with external proxies, ports are bound to `127.0.0.1` for security:
+
+```yaml
+ports:
+  - '127.0.0.1:8080:80'  # Dashboard
+  - '127.0.0.1:8081:80'  # NetBird server
+```
+
+If your reverse proxy is on a different host, bind to `0.0.0.0`:
+
+```yaml
+ports:
+  - '8080:80'
+  - '8081:80'
+```
+
+<Warning>
+Binding to 0.0.0.0 exposes services to the network. Ensure proper firewall rules are in place.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Install Clients" icon="download" href="/installation">
+    Install NetBird clients on your devices
+  </Card>
+  <Card title="Access Control" icon="shield-halved" href="/network/access-control">
+    Configure access policies and network rules
+  </Card>
+  <Card title="DNS Management" icon="network-wired" href="/network/dns">
+    Set up private DNS for your network
+  </Card>
+  <Card title="Routing" icon="route" href="/network/routes">
+    Configure routes to external networks
+  </Card>
+</CardGroup>

@@ -1,0 +1,442 @@
+---
+title: DNS API
+description: Configure DNS nameservers and custom zones
+---
+
+The DNS API allows you to configure DNS nameservers, manage custom DNS zones, and control DNS settings for your NetBird network.
+
+## Nameserver Groups
+
+Nameserver groups define DNS servers that peers should use for resolving domains.
+
+### List All Nameserver Groups
+
+```bash
+GET /api/dns/nameservers
+```
+
+<CodeGroup>
+```bash Request
+curl -X GET https://api.netbird.io/api/dns/nameservers \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```json Response
+[
+  {
+    "id": "ch8i4ug6lnn4g9hqv7m0",
+    "name": "Google DNS",
+    "description": "Google public DNS servers",
+    "nameservers": [
+      {
+        "ip": "8.8.8.8",
+        "ns_type": "udp",
+        "port": 53
+      },
+      {
+        "ip": "8.8.4.4",
+        "ns_type": "udp",
+        "port": 53
+      }
+    ],
+    "enabled": true,
+    "groups": ["ch8i4ug6lnn4g9hqv7m1"],
+    "primary": false,
+    "domains": ["example.com"],
+    "search_domains_enabled": true
+  }
+]
+```
+</CodeGroup>
+
+<ResponseField name="id" type="string">
+  Unique nameserver group identifier
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Nameserver group name (1-40 characters)
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Description of the nameserver group
+</ResponseField>
+
+<ResponseField name="nameservers" type="array">
+  List of nameserver configurations (1-3 servers)
+</ResponseField>
+
+<ResponseField name="enabled" type="boolean">
+  Whether the nameserver group is active
+</ResponseField>
+
+<ResponseField name="groups" type="array">
+  Peer group IDs that should use these nameservers
+</ResponseField>
+
+<ResponseField name="primary" type="boolean">
+  Primary nameserver group resolves all domains (requires empty `domains`)
+</ResponseField>
+
+<ResponseField name="domains" type="array">
+  Match domain list (empty only if `primary: true`)
+</ResponseField>
+
+<ResponseField name="search_domains_enabled" type="boolean">
+  Enable search domains (only when `domains` is not empty)
+</ResponseField>
+
+### Create a Nameserver Group
+
+```bash
+POST /api/dns/nameservers
+```
+
+<ParamField body="name" type="string" required>
+  Nameserver group name (1-40 characters)
+</ParamField>
+
+<ParamField body="description" type="string" required>
+  Description of the nameserver group
+</ParamField>
+
+<ParamField body="nameservers" type="array" required>
+  List of 1-3 nameserver configurations
+</ParamField>
+
+<ParamField body="enabled" type="boolean" required>
+  Whether the nameserver group is active
+</ParamField>
+
+<ParamField body="groups" type="array" required>
+  Peer group IDs that should use these nameservers
+</ParamField>
+
+<ParamField body="primary" type="boolean" required>
+  Whether this is the primary nameserver group
+</ParamField>
+
+<ParamField body="domains" type="array" required>
+  Match domain list (1-255 characters each)
+</ParamField>
+
+<ParamField body="search_domains_enabled" type="boolean" required>
+  Enable search domains for match domains
+</ParamField>
+
+<CodeGroup>
+```bash Primary Nameservers
+curl -X POST https://api.netbird.io/api/dns/nameservers \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Cloudflare DNS",
+    "description": "Primary DNS using Cloudflare",
+    "nameservers": [
+      {"ip": "1.1.1.1", "ns_type": "udp", "port": 53},
+      {"ip": "1.0.0.1", "ns_type": "udp", "port": 53}
+    ],
+    "enabled": true,
+    "groups": ["ch8i4ug6lnn4g9hqv7m0"],
+    "primary": true,
+    "domains": [],
+    "search_domains_enabled": false
+  }'
+```
+
+```bash Domain-Specific
+curl -X POST https://api.netbird.io/api/dns/nameservers \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Corporate DNS",
+    "description": "Internal corporate nameservers",
+    "nameservers": [
+      {"ip": "10.0.1.53", "ns_type": "udp", "port": 53}
+    ],
+    "enabled": true,
+    "groups": ["ch8i4ug6lnn4g9hqv7m0"],
+    "primary": false,
+    "domains": ["corp.example.com", "internal.example.com"],
+    "search_domains_enabled": true
+  }'
+```
+</CodeGroup>
+
+### Update a Nameserver Group
+
+```bash
+PUT /api/dns/nameservers/{nsgroupId}
+```
+
+<ParamField path="nsgroupId" type="string" required>
+  The unique identifier of the nameserver group
+</ParamField>
+
+```bash Example
+curl -X PUT https://api.netbird.io/api/dns/nameservers/ch8i4ug6lnn4g9hqv7m0 \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Updated DNS",
+    "description": "Updated nameservers",
+    "nameservers": [...],
+    "enabled": true,
+    "groups": [...],
+    "primary": false,
+    "domains": ["example.com"],
+    "search_domains_enabled": true
+  }'
+```
+
+### Delete a Nameserver Group
+
+```bash
+DELETE /api/dns/nameservers/{nsgroupId}
+```
+
+```bash Example
+curl -X DELETE https://api.netbird.io/api/dns/nameservers/ch8i4ug6lnn4g9hqv7m0 \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+## DNS Settings
+
+Manage global DNS settings including which groups have DNS management disabled.
+
+### Get DNS Settings
+
+```bash
+GET /api/dns/settings
+```
+
+```bash Example
+curl -X GET https://api.netbird.io/api/dns/settings \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+<ResponseField name="disabled_management_groups" type="array">
+  Group IDs whose DNS management is disabled
+</ResponseField>
+
+### Update DNS Settings
+
+```bash
+PUT /api/dns/settings
+```
+
+<ParamField body="disabled_management_groups" type="array" required>
+  Group IDs to disable DNS management for
+</ParamField>
+
+```bash Example
+curl -X PUT https://api.netbird.io/api/dns/settings \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "disabled_management_groups": ["ch8i4ug6lnn4g9hqv7m0"]
+  }'
+```
+
+## Custom DNS Zones
+
+Create custom DNS zones with A, AAAA, and CNAME records.
+
+### List All DNS Zones
+
+```bash
+GET /api/dns/zones
+```
+
+<CodeGroup>
+```bash Request
+curl -X GET https://api.netbird.io/api/dns/zones \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```json Response
+[
+  {
+    "id": "ch8i4ug6lnn4g9hqv7m0",
+    "name": "Internal Zone",
+    "domain": "internal.company.com",
+    "enabled": true,
+    "enable_search_domain": false,
+    "distribution_groups": ["ch8i4ug6lnn4g9hqv7m1"],
+    "records": [
+      {
+        "id": "rec_123",
+        "name": "app.internal.company.com",
+        "type": "A",
+        "content": "192.168.1.10",
+        "ttl": 300
+      }
+    ]
+  }
+]
+```
+</CodeGroup>
+
+### Create a DNS Zone
+
+```bash
+POST /api/dns/zones
+```
+
+<ParamField body="name" type="string" required>
+  Zone name identifier (1-255 characters)
+</ParamField>
+
+<ParamField body="domain" type="string" required>
+  Zone domain (FQDN)
+</ParamField>
+
+<ParamField body="enable_search_domain" type="boolean" required>
+  Enable this zone as a search domain
+</ParamField>
+
+<ParamField body="distribution_groups" type="array" required>
+  Group IDs that will use this zone
+</ParamField>
+
+```bash Example
+curl -X POST https://api.netbird.io/api/dns/zones \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Internal Services",
+    "domain": "internal.company.com",
+    "enable_search_domain": true,
+    "distribution_groups": ["ch8i4ug6lnn4g9hqv7m0"]
+  }'
+```
+
+### Update a DNS Zone
+
+```bash
+PUT /api/dns/zones/{zoneId}
+```
+
+### Delete a DNS Zone
+
+```bash
+DELETE /api/dns/zones/{zoneId}
+```
+
+## DNS Records
+
+Manage DNS records within custom zones.
+
+### Create a DNS Record
+
+```bash
+POST /api/dns/zones/{zoneId}/records
+```
+
+<ParamField path="zoneId" type="string" required>
+  The unique identifier of the zone
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  FQDN for the DNS record (must be subdomain of zone)
+</ParamField>
+
+<ParamField body="type" type="string" required>
+  DNS record type: `A`, `AAAA`, or `CNAME`
+</ParamField>
+
+<ParamField body="content" type="string" required>
+  DNS record content (IP for A/AAAA, domain for CNAME)
+</ParamField>
+
+<ParamField body="ttl" type="integer" required>
+  Time to live in seconds (minimum: 0)
+</ParamField>
+
+<CodeGroup>
+```bash A Record
+curl -X POST https://api.netbird.io/api/dns/zones/zone_123/records \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "api.internal.company.com",
+    "type": "A",
+    "content": "192.168.1.100",
+    "ttl": 300
+  }'
+```
+
+```bash CNAME Record
+curl -X POST https://api.netbird.io/api/dns/zones/zone_123/records \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "www.internal.company.com",
+    "type": "CNAME",
+    "content": "api.internal.company.com",
+    "ttl": 600
+  }'
+```
+</CodeGroup>
+
+### Update a DNS Record
+
+```bash
+PUT /api/dns/zones/{zoneId}/records/{recordId}
+```
+
+### Delete a DNS Record
+
+```bash
+DELETE /api/dns/zones/{zoneId}/records/{recordId}
+```
+
+## DNS Resolution Flow
+
+1. **Custom Zones** - Checked first for matching domains
+2. **Domain-Specific Nameservers** - Used for configured domains
+3. **Primary Nameservers** - Used for all other queries
+4. **System DNS** - Fallback if no NetBird DNS configured
+
+## Common Configurations
+
+### Split DNS
+
+Use different nameservers for different domains:
+
+```json
+[
+  {
+    "name": "Corporate DNS",
+    "primary": false,
+    "domains": ["corp.company.com"],
+    "nameservers": [{"ip": "10.0.1.53"}]
+  },
+  {
+    "name": "Public DNS",
+    "primary": true,
+    "domains": [],
+    "nameservers": [{"ip": "1.1.1.1"}]
+  }
+]
+```
+
+### Search Domains
+
+Enable search domains for easy access:
+
+```json
+{
+  "domains": ["company.com"],
+  "search_domains_enabled": true
+}
+```
+
+Allows `ping server` instead of `ping server.company.com`
+
+## Best Practices
+
+<Check>**Use primary nameservers** - Always configure a primary for general DNS resolution</Check>
+<Check>**Split internal/external** - Use separate nameservers for internal vs external domains</Check>
+<Check>**Enable search domains** - Makes internal resources easier to access</Check>
+<Check>**Set appropriate TTLs** - Lower for dynamic records, higher for static</Check>
+<Check>**Monitor DNS health** - Ensure nameservers are reachable</Check>

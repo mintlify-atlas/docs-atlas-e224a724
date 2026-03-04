@@ -1,0 +1,389 @@
+---
+title: Multi-Factor Authentication (MFA)
+description: Enforce multi-factor authentication for enhanced security
+---
+
+Multi-Factor Authentication (MFA) adds an additional layer of security to your NetBird network by requiring users to provide two or more verification factors to gain access.
+
+## MFA Through Identity Providers
+
+NetBird leverages your configured identity provider's MFA capabilities rather than implementing its own MFA system. This approach provides:
+
+- **Centralized Security**: Manage MFA policies in one place
+- **Consistent Experience**: Users use familiar MFA methods from your IdP
+- **Advanced Features**: Access IdP-specific features like adaptive authentication
+- **Reduced Complexity**: No separate MFA system to maintain
+
+## Supported MFA Methods by IdP
+
+Different identity providers support various MFA methods:
+
+<Tabs>
+  <Tab title="Auth0">
+    Auth0 supports multiple MFA methods:
+    
+    - SMS one-time passwords (OTP)
+    - Push notifications via Auth0 Guardian
+    - Time-based OTP (TOTP) apps like Google Authenticator
+    - Email OTP
+    - WebAuthn/FIDO2 security keys
+    - Biometric authentication
+    
+    Configure MFA in your Auth0 dashboard under Security > Multi-factor Auth.
+  </Tab>
+  
+  <Tab title="Azure AD">
+    Microsoft Azure AD provides:
+    
+    - Microsoft Authenticator app
+    - SMS and voice calls
+    - OATH hardware and software tokens
+    - FIDO2 security keys
+    - Certificate-based authentication
+    - Windows Hello for Business
+    
+    Configure in Azure AD under Security > Authentication methods.
+  </Tab>
+  
+  <Tab title="Okta">
+    Okta MFA options include:
+    
+    - Okta Verify push notifications
+    - SMS and voice call OTP
+    - Google Authenticator and other TOTP apps
+    - Security questions
+    - Hardware tokens (RSA, YubiKey)
+    - WebAuthn
+    
+    Set up in Okta Admin Console under Security > Multifactor.
+  </Tab>
+  
+  <Tab title="Google Workspace">
+    Google Workspace supports:
+    
+    - Google Authenticator
+    - Google Prompt on mobile devices
+    - Security keys (USB, NFC, Bluetooth)
+    - Backup codes
+    - SMS and voice calls
+    
+    Configure under Admin console > Security > 2-Step Verification.
+  </Tab>
+  
+  <Tab title="Keycloak">
+    Keycloak provides:
+    
+    - Time-based OTP (TOTP)
+    - WebAuthn/FIDO2
+    - SMS OTP (requires SMS provider configuration)
+    - Email OTP
+    
+    Configure in Keycloak under Authentication > Required Actions and Flows.
+  </Tab>
+</Tabs>
+
+## Enforcing MFA for NetBird Access
+
+To require MFA for NetBird authentication:
+
+<Steps>
+  <Step title="Enable MFA in Your IdP">
+    Configure and enable MFA in your identity provider's admin console.
+    
+    <Warning>
+    Test MFA with a small group of users first before enforcing organization-wide.
+    </Warning>
+  </Step>
+  
+  <Step title="Set MFA Policy">
+    Create an authentication policy that requires MFA for NetBird application access.
+    
+    Example for Auth0:
+    ```json
+    {
+      "name": "NetBird MFA Enforcement",
+      "actions": [{
+        "action": "require-multifactor-authentication"
+      }],
+      "applications": ["netbird-client-id"]
+    }
+    ```
+  </Step>
+  
+  <Step title="Test Authentication">
+    Verify users are prompted for MFA when logging into NetBird clients.
+  </Step>
+  
+  <Step title="Monitor Compliance">
+    Review authentication logs to ensure MFA is being used consistently.
+  </Step>
+</Steps>
+
+## IdP-Specific Configuration
+
+### Auth0 MFA Enforcement
+
+<CodeGroup>
+```javascript Auth0 Rule
+// Create an Auth0 Rule to enforce MFA for NetBird
+function(user, context, callback) {
+  // Check if this is the NetBird application
+  if (context.clientName === 'NetBird') {
+    // Require MFA
+    context.multifactor = {
+      provider: 'any',
+      allowRememberBrowser: false
+    };
+  }
+  callback(null, user, context);
+}
+```
+
+```json Auth0 Actions
+// Modern Auth0 Actions API
+exports.onExecutePostLogin = async (event, api) => {
+  if (event.client.name === 'NetBird') {
+    api.multifactor.enable('any', { allowRememberBrowser: false });
+  }
+};
+```
+</CodeGroup>
+
+### Azure AD Conditional Access
+
+Create a Conditional Access policy:
+
+1. Navigate to Azure AD > Security > Conditional Access
+2. Create new policy:
+   - **Name**: NetBird MFA Required
+   - **Users**: Select target users/groups
+   - **Cloud apps**: Select NetBird application
+   - **Grant**: Require multi-factor authentication
+3. Enable the policy
+
+### Okta Sign-On Policy
+
+1. Go to Security > Authentication Policies
+2. Add Rule to your NetBird app:
+   - **Rule Name**: Require MFA
+   - **Prompt for factor**: Every sign on
+   - **Re-authentication frequency**: Every time
+
+## User Enrollment
+
+Guide users through MFA enrollment:
+
+<Steps>
+  <Step title="Notify Users">
+    Inform users about upcoming MFA requirement and enrollment deadline.
+  </Step>
+  
+  <Step title="Provide Instructions">
+    Share step-by-step guides for enrolling MFA devices with your IdP.
+  </Step>
+  
+  <Step title="Offer Support">
+    Set up help desk resources to assist with enrollment issues.
+  </Step>
+  
+  <Step title="Grace Period">
+    Consider a grace period where MFA is encouraged but not required.
+  </Step>
+</Steps>
+
+## Backup Authentication Methods
+
+Always configure backup authentication methods to prevent lockouts:
+
+<CardGroup cols={2}>
+  <Card title="Backup Codes" icon="key">
+    Generate one-time backup codes users can print and store securely.
+  </Card>
+  <Card title="Multiple Devices" icon="mobile">
+    Allow users to register multiple MFA devices.
+  </Card>
+  <Card title="Alternative Methods" icon="shield">
+    Enable SMS or email as fallback when primary method unavailable.
+  </Card>
+  <Card title="Admin Recovery" icon="user-shield">
+    Establish admin procedures for MFA reset requests.
+  </Card>
+</CardGroup>
+
+## Periodic Re-Authentication
+
+NetBird supports periodic re-authentication to ensure users remain authorized:
+
+### Login Expiration
+
+Peers added via SSO can be configured to require periodic re-authentication:
+
+```json
+{
+  "Settings": {
+    "PeerLoginExpirationEnabled": true,
+    "PeerLoginExpiration": 604800  // 7 days in seconds
+  }
+}
+```
+
+<Info>
+- **Minimum**: 1 hour (3600 seconds)
+- **Maximum**: 180 days (15552000 seconds)
+- Only applies to peers added via SSO login (not setup keys)
+</Info>
+
+### Inactivity Expiration
+
+Automatically expire inactive peer sessions:
+
+```json
+{
+  "Settings": {
+    "PeerInactivityExpirationEnabled": true,
+    "PeerInactivityExpiration": 2592000  // 30 days in seconds
+  }
+}
+```
+
+<Warning>
+Peers added with setup keys are not subject to login expiration. Only peers added through interactive SSO login can be expired and require re-authentication.
+</Warning>
+
+## Monitoring and Compliance
+
+### Authentication Logs
+
+Monitor MFA usage through your IdP's logging:
+
+- Track successful MFA authentications
+- Identify failed MFA attempts
+- Review MFA enrollment rates
+- Detect anomalous authentication patterns
+
+### Compliance Reporting
+
+Generate reports to demonstrate MFA compliance:
+
+<AccordionGroup>
+  <Accordion title="Auth0 Compliance Reports">
+    Use Auth0 logs to export authentication events:
+    
+    ```bash
+    # Export Auth0 logs via Management API
+    curl -X GET 'https://YOUR_DOMAIN.auth0.com/api/v2/logs' \
+      -H 'Authorization: Bearer YOUR_TOKEN' \
+      --data-urlencode 'q=type:f' \
+      --data-urlencode 'fields=date,type,description,user_name'
+    ```
+  </Accordion>
+  
+  <Accordion title="Azure AD Sign-In Reports">
+    Access Azure AD sign-in logs:
+    
+    1. Navigate to Azure AD > Monitoring > Sign-ins
+    2. Filter by NetBird application
+    3. Export to CSV or connect to Azure Sentinel for advanced analytics
+  </Accordion>
+  
+  <Accordion title="Okta System Logs">
+    Query Okta system logs:
+    
+    ```bash
+    # Get MFA events via Okta API
+    curl -X GET 'https://YOUR_DOMAIN.okta.com/api/v1/logs' \
+      -H 'Authorization: SSWS YOUR_API_TOKEN' \
+      --data-urlencode 'filter=eventType eq "user.authentication.auth_via_mfa"'
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Users Not Prompted for MFA">
+    **Possible causes:**
+    - MFA policy not applied to NetBird application
+    - User already has active session with valid MFA
+    - Policy exceptions or exclusions in effect
+    
+    **Solutions:**
+    - Verify policy assignment in IdP
+    - Force user logout and re-login
+    - Review policy conditions and exclusions
+  </Accordion>
+  
+  <Accordion title="MFA Enrollment Failures">
+    **Possible causes:**
+    - Time synchronization issues with TOTP
+    - Network connectivity problems
+    - Incompatible authenticator app
+    
+    **Solutions:**
+    - Ensure device time is synchronized (NTP)
+    - Check network firewall rules
+    - Try alternative MFA method
+    - Use IdP's recommended authenticator app
+  </Accordion>
+  
+  <Accordion title="User Locked Out">
+    **Recovery steps:**
+    1. Verify user identity through established procedures
+    2. Use admin console to reset MFA for the user
+    3. Have user re-enroll MFA devices
+    4. Provide backup codes for future use
+    
+    <Warning>
+    Document your MFA reset procedures and require proper authorization for security.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Phased Rollout">
+    Deploy MFA in phases:
+    - Start with IT/admin users
+    - Expand to privileged users
+    - Roll out to all users
+  </Step>
+  
+  <Step title="User Education">
+    Provide comprehensive training:
+    - Explain why MFA is important
+    - Demonstrate enrollment process
+    - Share troubleshooting resources
+  </Step>
+  
+  <Step title="Multiple Factors">
+    Encourage users to register multiple MFA methods for redundancy.
+  </Step>
+  
+  <Step title="Regular Audits">
+    Periodically review:
+    - MFA enrollment rates
+    - Authentication success rates
+    - Backup method usage
+    - Policy effectiveness
+  </Step>
+  
+  <Step title="Adaptive Authentication">
+    Leverage IdP adaptive authentication features:
+    - Risk-based MFA prompts
+    - Device trust evaluation
+    - Location-based policies
+    - Impossible travel detection
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Posture Checks" icon="clipboard-check" href="/security/posture-checks">
+    Add device security requirements
+  </Card>
+  <Card title="Access Control" icon="lock" href="/network/access-control">
+    Configure network access policies
+  </Card>
+</CardGroup>

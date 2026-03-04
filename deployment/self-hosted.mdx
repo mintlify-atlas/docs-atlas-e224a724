@@ -1,0 +1,241 @@
+---
+title: Self-Hosted Overview
+description: Requirements and overview for self-hosting NetBird infrastructure
+---
+
+NetBird can be self-hosted on your own infrastructure, giving you complete control over your network management system. This guide covers the requirements and considerations for self-hosting NetBird.
+
+## Infrastructure Requirements
+
+### Hardware Requirements
+
+For a production deployment, you'll need:
+
+- **Linux VM** with at least **1 CPU** and **2GB RAM**
+- More resources may be needed for larger deployments (100+ peers)
+- Additional storage for logs and database (5GB+ recommended)
+
+### Network Requirements
+
+The server must be publicly accessible on the following ports:
+
+<Note>
+These ports must be open in your firewall and properly forwarded if behind NAT.
+</Note>
+
+| Port | Protocol | Service | Required |
+|------|----------|---------|----------|
+| 80 | TCP | HTTP (redirect to HTTPS) | Yes |
+| 443 | TCP | HTTPS (Dashboard, Management API, Signal, Relay) | Yes |
+| 3478 | UDP | STUN/TURN (NAT traversal) | Yes |
+| 51820 | UDP | WireGuard (for Proxy service) | Optional |
+
+### Domain Requirements
+
+You need a **public domain name** pointing to your server's IP address. The getting-started script uses this domain to:
+
+- Generate TLS certificates via Let's Encrypt
+- Configure OAuth2 endpoints for the embedded identity provider
+- Enable secure client connections
+
+<Warning>
+Do not use `localhost` or IP addresses for production deployments. TLS certificates and OAuth2 flows require a proper domain name.
+</Warning>
+
+## Software Requirements
+
+### Docker
+
+NetBird requires Docker with the docker-compose plugin (or docker-compose v2+):
+
+```bash
+# Check Docker installation
+docker --version
+docker compose version
+```
+
+Follow the [official Docker installation guide](https://docs.docker.com/engine/install/) for your Linux distribution.
+
+### Required Utilities
+
+The setup script requires these utilities:
+
+- **jq** - JSON processor for configuration parsing
+- **curl** - For downloading configuration and testing endpoints
+
+```bash
+# Debian/Ubuntu
+sudo apt update && sudo apt install jq curl
+
+# RHEL/CentOS
+sudo yum install jq curl
+```
+
+## Architecture Overview
+
+A self-hosted NetBird deployment consists of:
+
+### NetBird Server (Combined)
+
+Starting with recent versions, NetBird uses a **combined server** container that includes:
+
+- **Management Service** - Handles peer registration, network state, and access policies
+- **Signal Service** - WebRTC signaling for peer-to-peer connection establishment  
+- **Relay Service** - WebSocket relay for peers that cannot connect directly
+- **STUN Service** - NAT discovery and traversal
+- **Embedded Identity Provider** - OAuth2/OIDC provider (using Dex)
+
+The combined server runs on:
+- Port 80 (HTTP) internally
+- Exposed via reverse proxy on port 443 (HTTPS)
+
+### Dashboard
+
+The web-based admin interface for:
+
+- Managing peers and access policies
+- Viewing network activity
+- Configuring routes and DNS
+- User management
+
+### Reverse Proxy (Optional)
+
+The getting-started script can configure:
+
+- **Built-in Traefik** (recommended) - Automatic TLS via Let's Encrypt
+- **External Traefik** - Integration with existing Traefik instance
+- **Nginx** - Manual TLS certificate configuration
+- **Nginx Proxy Manager** - GUI-based configuration
+- **Caddy** - Automatic TLS with simple configuration
+- **Other/Manual** - Custom reverse proxy setup
+
+### Storage
+
+NetBird uses **SQLite** by default for storing:
+
+- Peer information and metadata
+- Access policies and network configuration
+- User accounts and activity logs
+
+Data is persisted in Docker volumes:
+
+- `netbird_data` - Management database and state
+- `netbird_traefik_letsencrypt` - TLS certificates (if using built-in Traefik)
+
+<Note>
+For production deployments with many peers, you can configure PostgreSQL or MySQL as the database backend by setting environment variables in the configuration.
+</Note>
+
+## Identity Provider Options
+
+### Embedded Identity Provider (Default)
+
+The getting-started.sh script configures an **embedded identity provider** using Dex:
+
+- No external IdP required
+- OAuth2/OIDC compliant
+- Built into the management server
+- Endpoints automatically configured at `/oauth2`
+
+### External Identity Providers
+
+For advanced setups, NetBird supports integration with:
+
+- **Zitadel** - Use `getting-started-with-zitadel.sh`
+- **Auth0** - Commercial identity platform
+- **Keycloak** - Open-source identity management
+- **Azure AD** - Microsoft identity platform
+- **Google Workspace** - Google OAuth
+- **Okta** - Enterprise identity provider
+
+External IdP configuration requires:
+
+1. OAuth2 client registration in your IdP
+2. Configuring OIDC endpoints in `setup.env`
+3. Running `configure.sh` to generate configuration files
+
+See the [Identity Providers](/security/sso-setup) guide for detailed setup instructions.
+
+## Configuration Files
+
+Self-hosted deployments use these configuration files:
+
+### config.yaml (Combined Server)
+
+Generated by getting-started.sh with settings for:
+
+```yaml
+server:
+  listenAddress: ":80"
+  exposedAddress: "https://your-domain.com:443"
+  stunPorts: [3478]
+  auth:
+    issuer: "https://your-domain.com/oauth2"
+    dashboardRedirectURIs:
+      - "https://your-domain.com/nb-auth"
+  store:
+    engine: "sqlite"
+    encryptionKey: "<generated>"
+```
+
+### dashboard.env
+
+Environment variables for the dashboard:
+
+```bash
+NETBIRD_MGMT_API_ENDPOINT=https://your-domain.com
+AUTH_AUDIENCE=netbird-dashboard
+AUTH_AUTHORITY=https://your-domain.com/oauth2
+```
+
+### docker-compose.yml
+
+Orchestrates all services with proper networking and volume mounts.
+
+## Data Encryption
+
+NetBird encrypts sensitive data at multiple levels:
+
+- **Datastore Encryption Key** - Encrypts sensitive data in the database (auto-generated)
+- **Relay Auth Secret** - Authenticates peers to the relay service (auto-generated)
+- **WireGuard Keys** - End-to-end peer-to-peer encryption
+
+<Warning>
+The encryption keys are stored in `config.yaml`. Back up this file securely - losing it means losing access to your encrypted data.
+</Warning>
+
+## Quick Start Command
+
+The fastest way to get started with self-hosting:
+
+```bash
+export NETBIRD_DOMAIN=netbird.example.com
+curl -fsSL https://github.com/netbirdio/netbird/releases/latest/download/getting-started.sh | bash
+```
+
+This script will:
+
+1. Prompt for your domain name
+2. Choose reverse proxy configuration (Traefik recommended)
+3. Generate all configuration files
+4. Start NetBird services
+5. Configure automatic TLS certificates
+
+For detailed step-by-step instructions, see the [Docker Compose Deployment](/deployment/docker-compose) guide.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Compose" icon="docker" href="/deployment/docker-compose">
+    Deploy with Docker Compose using the getting-started script
+  </Card>
+  <Card title="Kubernetes" icon="dharmachakra" href="/deployment/kubernetes">
+    Deploy NetBird on Kubernetes clusters
+  </Card>
+  <Card title="Identity Providers" icon="id-card" href="/security/sso-setup">
+    Configure external identity providers
+  </Card>
+  <Card title="Cloud vs Self-Hosted" icon="cloud" href="/deployment/cloud">
+    Compare NetBird Cloud with self-hosted options
+  </Card>
+</CardGroup>

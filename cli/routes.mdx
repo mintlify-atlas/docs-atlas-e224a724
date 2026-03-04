@@ -1,0 +1,513 @@
+---
+title: netbird networks (routes)
+description: Manage NetBird network routes and resources
+---
+
+## Overview
+
+The `netbird networks` command (also available as `netbird routes`) manages connections to NetBird networks and resources. Use this to view available network routes and control which networks your peer can access.
+
+```bash
+netbird networks <subcommand> [flags]
+netbird routes <subcommand> [flags]  # alias
+```
+
+## Description
+
+NetBird networks allow you to:
+
+- Access remote networks and resources through exit nodes
+- Route traffic to specific IP ranges or domains
+- Control which networks your peer connects to
+- View domain-based routes with resolved IPs
+
+Network routes are managed by administrators in the NetBird Management Dashboard. Peers can select which routes to use.
+
+## Subcommands
+
+- `list` (alias: `ls`) - List all available network routes
+- `select` - Select network routes to use
+- `deselect` - Deselect network routes
+
+## list
+
+List all available network routes.
+
+```bash
+netbird networks list
+netbird routes list
+netbird routes ls
+```
+
+### Description
+
+Displays all network routes available to your peer, including:
+
+- **Network routes**: IP ranges (CIDR notation)
+- **Domain routes**: Domain names with resolved IPs
+- **Selection status**: Whether each route is selected
+
+### Examples
+
+**List all routes:**
+```bash
+netbird networks list
+```
+
+**Example output:**
+```
+Available Networks:
+
+  - ID: route-abc123
+    Network: 10.0.0.0/24
+    Status: Selected
+
+  - ID: route-def456
+    Network: 172.16.0.0/16
+    Status: Not Selected
+
+  - ID: route-ghi789
+    Domains: internal.example.com, app.example.com
+    Status: Selected
+    Resolved IPs:
+      [internal.example.com]: 10.1.2.3
+      [app.example.com]: 10.1.2.4, 10.1.2.5
+
+  - ID: route-jkl012
+    Domains: *.prod.example.com
+    Status: Selected
+    Resolved IPs: -
+```
+
+### Understanding the Output
+
+**Network Routes:**
+- **ID**: Unique identifier for the route
+- **Network**: IP range in CIDR notation (e.g., `10.0.0.0/24`)
+- **Status**: `Selected` or `Not Selected`
+
+**Domain Routes:**
+- **ID**: Unique identifier for the route
+- **Domains**: One or more domain names (can include wildcards)
+- **Status**: `Selected` or `Not Selected`
+- **Resolved IPs**: Current DNS resolution results for each domain
+
+### No Routes Available
+
+If no routes are configured:
+
+```
+No networks available.
+```
+
+Contact your NetBird administrator to configure network routes.
+
+## select
+
+Select network routes to use.
+
+```bash
+netbird networks select <network_id>... | all [flags]
+netbird routes select <network_id>... | all [flags]
+```
+
+### Description
+
+Selecting a route enables your peer to:
+- Access the network/domain through the designated exit node
+- Route traffic for that network through NetBird
+- Apply any associated firewall or access policies
+
+### Flags
+
+<ParamField path="--append" type="boolean" default="false">
+  Append to current network selection instead of replacing
+  
+  Short form: `-a`
+  
+  By default, `select` replaces your current selection. Use this flag to add routes without removing existing ones.
+</ParamField>
+
+### Arguments
+
+- `<network_id>...` - One or more route IDs to select
+- `all` - Select all available routes (clears all selections and accepts all including new routes)
+
+### Examples
+
+**Select a single route:**
+```bash
+netbird networks select route-abc123
+```
+
+**Select multiple routes:**
+```bash
+netbird networks select route-abc123 route-def456
+```
+
+**Select all routes:**
+```bash
+netbird networks select all
+```
+
+<Info>
+  Selecting `all` is special: it not only selects all current routes but also automatically selects any new routes added in the future.
+</Info>
+
+**Add routes to existing selection (append mode):**
+```bash
+netbird routes select -a route-ghi789
+```
+
+**Replace selection with new routes:**
+```bash
+netbird networks select route-abc123 route-def456
+```
+
+### Behavior
+
+**Default mode (replace):**
+- Deselects all previously selected routes
+- Selects only the specified routes
+
+**Append mode (`-a`):**
+- Keeps existing selections
+- Adds new routes to the selection
+
+## deselect
+
+Deselect network routes.
+
+```bash
+netbird networks deselect <network_id>... | all
+netbird routes deselect <network_id>... | all
+```
+
+### Description
+
+Deselecting a route stops routing traffic for that network through NetBird.
+
+### Arguments
+
+- `<network_id>...` - One or more route IDs to deselect
+- `all` - Deselect all routes (disable accepting any networks)
+
+### Examples
+
+**Deselect a single route:**
+```bash
+netbird networks deselect route-abc123
+```
+
+**Deselect multiple routes:**
+```bash
+netbird networks deselect route-abc123 route-def456
+```
+
+**Deselect all routes:**
+```bash
+netbird networks deselect all
+```
+
+<Warning>
+  Deselecting `all` disables accepting any network routes, including future ones. You won't receive any network routes until you select them again.
+</Warning>
+
+## Complete Workflow Examples
+
+### View and Select Routes
+
+```bash
+# 1. List available routes
+netbird networks list
+
+# 2. Select needed routes
+netbird networks select route-abc123 route-def456
+
+# 3. Verify selection
+netbird networks list
+
+# 4. Check connectivity
+netbird status --detail
+```
+
+### Add Route to Existing Selection
+
+```bash
+# View current selection
+netbird networks list
+
+# Add new route without affecting others
+netbird networks select -a route-ghi789
+
+# Verify
+netbird networks list
+```
+
+### Remove Specific Routes
+
+```bash
+# List current routes
+netbird networks list
+
+# Deselect unwanted routes
+netbird networks deselect route-def456
+
+# Verify
+netbird networks list
+```
+
+### Accept All Routes (Including Future)
+
+```bash
+# Select all current and future routes
+netbird networks select all
+
+# Verify - all routes should be selected
+netbird networks list
+```
+
+### Disable All Routes
+
+```bash
+# Deselect all routes
+netbird networks deselect all
+
+# Verify - all routes should be deselected
+netbird networks list
+```
+
+## Network Types
+
+### IP Range Routes (Network Routes)
+
+Route traffic to specific IP ranges:
+
+```
+- ID: route-office-lan
+  Network: 10.10.0.0/16
+  Status: Selected
+```
+
+**Use cases:**
+- Access office LAN
+- Connect to private cloud networks
+- Reach internal infrastructure
+
+### Domain Routes
+
+Route traffic to specific domains:
+
+```
+- ID: route-internal-apps
+  Domains: app.internal.com, api.internal.com
+  Status: Selected
+  Resolved IPs:
+    [app.internal.com]: 10.20.1.5
+    [api.internal.com]: 10.20.1.6, 10.20.1.7
+```
+
+**Features:**
+- Supports wildcards (e.g., `*.internal.com`)
+- Automatically resolves DNS
+- Updates when IPs change
+
+**Use cases:**
+- Access internal web applications
+- Route API traffic
+- Connect to dynamic services
+
+## Route Selection Strategies
+
+### Minimal Selection
+
+Select only routes you actively use:
+
+```bash
+netbird networks select route-office-network
+```
+
+**Pros:**
+- Reduced routing complexity
+- Explicit control
+- Easy troubleshooting
+
+**Cons:**
+- Must manually add new routes
+- May miss newly added networks
+
+### Accept All
+
+Automatically accept all routes:
+
+```bash
+netbird networks select all
+```
+
+**Pros:**
+- Automatic access to new networks
+- No maintenance needed
+- Complete network access
+
+**Cons:**
+- May route unneeded traffic
+- Less explicit control
+
+### Selective Append
+
+Start with specific routes, add as needed:
+
+```bash
+# Initial selection
+netbird networks select route-office route-vpn
+
+# Add new routes as needed
+netbird routes select -a route-new-service
+```
+
+**Pros:**
+- Balanced approach
+- Grows with needs
+- Maintains control
+
+## Verification
+
+### Check Route Status
+
+```bash
+netbird networks list
+```
+
+Look for `Status: Selected` on routes you expect to use.
+
+### Test Connectivity
+
+**Ping through route:**
+```bash
+# If route is for 10.0.0.0/24
+ping 10.0.0.1
+```
+
+**Check routing table:**
+```bash
+# Linux/macOS
+ip route | grep wt0
+netstat -rn | grep wt0
+
+# Windows
+route print
+```
+
+**Verify DNS resolution (domain routes):**
+```bash
+nslookup app.internal.com
+dig app.internal.com
+```
+
+### Check via Status
+
+```bash
+netbird status --detail
+```
+
+Look for network routes in the output.
+
+## Troubleshooting
+
+### Route Not Working After Selection
+
+1. **Verify selection:**
+   ```bash
+   netbird networks list
+   ```
+
+2. **Check connection:**
+   ```bash
+   netbird status
+   ```
+
+3. **Restart connection:**
+   ```bash
+   netbird down
+   netbird up
+   ```
+
+4. **Check exit node connectivity:**
+   ```bash
+   netbird status --detail
+   ```
+
+### Domain Route Not Resolving
+
+**Check DNS configuration:**
+```bash
+# Linux
+cat /etc/resolv.conf
+
+# macOS
+scutil --dns
+
+# Windows
+ipconfig /all
+```
+
+**Verify NetBird DNS:**
+```bash
+netbird status --detail
+```
+
+### Can't Select Route
+
+**Possible causes:**
+- Route ID typo
+- Route was deleted by admin
+- Insufficient permissions
+- Daemon not running
+
+**Solutions:**
+```bash
+# Verify route ID
+netbird networks list
+
+# Check daemon
+netbird status
+
+# Restart service
+sudo netbird service restart
+```
+
+### Routes Disappeared
+
+If routes are no longer listed:
+
+1. **Check management connection:**
+   ```bash
+   netbird status
+   ```
+
+2. **Refresh connection:**
+   ```bash
+   netbird down && netbird up
+   ```
+
+3. **Contact administrator** - routes may have been removed
+
+## Administration
+
+Network routes are configured by administrators in the NetBird Management Dashboard:
+
+1. Navigate to **Network Routes**
+2. Click **Add Route**
+3. Configure:
+   - Network (CIDR) or Domains
+   - Exit node/peer
+   - Distribution groups
+   - Access control policies
+
+See: [Network Routes Guide](/network/routes)
+
+## See Also
+
+- [netbird status](/cli/status) - View current routes in use
+- [Routing Traffic to Private Networks](/network/routes)
+- [DNS Configuration](/network/dns)

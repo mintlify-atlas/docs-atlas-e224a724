@@ -1,0 +1,368 @@
+---
+title: netbird up
+description: Connect to the NetBird network
+---
+
+## Overview
+
+The `netbird up` command connects your device to the NetBird network. It brings up the WireGuard interface, connects to the management server, and establishes peer-to-peer connections with other peers in your network.
+
+```bash
+netbird up [flags]
+```
+
+## Description
+
+This command performs the following actions:
+
+1. Authenticates with the management server (via SSO or setup key)
+2. Creates or updates the WireGuard interface
+3. Retrieves network configuration from the management server
+4. Establishes P2P connections with authorized peers
+5. Configures DNS, routes, and firewall rules as needed
+
+## Flags
+
+### Connection Options
+
+<ParamField path="--foreground-mode" type="boolean" default="false">
+  Start service in foreground mode instead of connecting to the daemon
+  
+  Short form: `-F`
+  
+  **Note:** In foreground mode, the process runs directly without using the system service.
+</ParamField>
+
+<ParamField path="--profile" type="string">
+  Profile name to use for the connection. If not specified, the last used profile will be used.
+</ParamField>
+
+<ParamField path="--no-browser" type="boolean" default="false">
+  Do not open the browser for SSO login. Useful for headless servers or automated scripts.
+</ParamField>
+
+### Network Configuration
+
+<ParamField path="--interface-name" type="string" default="wt0">
+  WireGuard interface name
+  
+  **Note:** On macOS, the interface name must use the `utun` prefix (e.g., `utun1`, `utun199`).
+</ParamField>
+
+<ParamField path="--wireguard-port" type="integer" default="51820">
+  WireGuard interface listening port
+</ParamField>
+
+<ParamField path="--mtu" type="integer" default="1280">
+  Set MTU (Maximum Transmission Unit) for the WireGuard interface
+</ParamField>
+
+<ParamField path="--network-monitor" type="boolean" default="true (Windows/macOS), false (Linux/FreeBSD)">
+  Manage network monitoring for detecting network changes
+  
+  Short form: `-N`
+  
+  Example: `--network-monitor=false` to disable or `--network-monitor=true` to enable
+</ParamField>
+
+### NAT and DNS
+
+<ParamField path="--external-ip-map" type="string[]">
+  Sets external IPs maps between local addresses and interfaces. Useful when behind NAT.
+  
+  You can specify:
+  - Single IP: `--external-ip-map 12.34.56.78`
+  - IP to IP mapping: `--external-ip-map 12.34.56.78/10.0.0.1`
+  - IP to interface: `--external-ip-map 12.34.56.80/eth1`
+  - Multiple mappings: `--external-ip-map 12.34.56.200,12.34.56.78/10.0.0.1,12.34.56.80/eth1`
+  - Clear configuration: `--external-ip-map ""`
+</ParamField>
+
+<ParamField path="--dns-resolver-address" type="string">
+  Sets a custom address for NetBird's local DNS resolver
+  
+  If set, the agent won't attempt to discover the best IP and port to listen on.
+  
+  Examples:
+  - `--dns-resolver-address 127.0.0.1:5053`
+  - Clear: `--dns-resolver-address ""`
+</ParamField>
+
+<ParamField path="--extra-dns-labels" type="string[]">
+  Sets DNS labels for the peer. You can specify up to 32 labels.
+  
+  Examples:
+  - Single label: `--extra-dns-labels vpc1`
+  - Multiple labels: `--extra-dns-labels vpc1,mgmt1`
+  - Clear labels: `--extra-dns-labels ""`
+</ParamField>
+
+<ParamField path="--dns-router-interval" type="duration" default="1m">
+  DNS route update interval
+</ParamField>
+
+### Security Options
+
+<ParamField path="--enable-rosenpass" type="boolean" default="false">
+  [Experimental] Enable Rosenpass for post-quantum security
+  
+  If enabled, connections will be post-quantum secured via Rosenpass.
+</ParamField>
+
+<ParamField path="--rosenpass-permissive" type="boolean" default="false">
+  [Experimental] Enable Rosenpass in permissive mode
+  
+  Allows this peer to accept WireGuard connections without requiring Rosenpass from peers that don't have it enabled.
+</ParamField>
+
+### Auto-Connect
+
+<ParamField path="--disable-auto-connect" type="boolean" default="false">
+  Disables auto-connect feature
+  
+  If enabled, the client won't connect automatically when the service starts.
+</ParamField>
+
+<ParamField path="--enable-lazy-connection" type="boolean" default="false">
+  [Experimental] Enable lazy connection feature
+  
+  If enabled, the client will establish connections on-demand.
+  
+  **Note:** This setting may be overridden by management configuration.
+</ParamField>
+
+### Advanced Options
+
+<ParamField path="--extra-iface-blacklist" type="string[]">
+  Extra list of default interfaces to ignore for listening
+</ParamField>
+
+### SSH Server Options
+
+<ParamField path="--allow-server-ssh" type="boolean" default="false">
+  Allow SSH server on this peer, enabling other peers to SSH into this machine
+</ParamField>
+
+<ParamField path="--enable-ssh-root" type="boolean" default="false">
+  Enable root login for SSH server
+</ParamField>
+
+<ParamField path="--enable-ssh-sftp" type="boolean" default="false">
+  Enable SFTP subsystem for SSH server
+</ParamField>
+
+<ParamField path="--enable-ssh-local-port-forwarding" type="boolean" default="false">
+  Enable local port forwarding for SSH server
+</ParamField>
+
+<ParamField path="--enable-ssh-remote-port-forwarding" type="boolean" default="false">
+  Enable remote port forwarding for SSH server
+</ParamField>
+
+<ParamField path="--disable-ssh-auth" type="boolean" default="false">
+  Disable SSH authentication
+</ParamField>
+
+<ParamField path="--ssh-jwt-cache-ttl" type="integer" default="0">
+  SSH JWT token cache TTL in seconds (0=disabled)
+</ParamField>
+
+## Examples
+
+### Basic Connection
+
+Connect to NetBird network with SSO:
+
+```bash
+netbird up
+```
+
+### Connect with Setup Key
+
+Register and connect using a setup key (non-interactive):
+
+```bash
+netbird up --setup-key YOUR_SETUP_KEY
+```
+
+### Connect to Self-Hosted Management Server
+
+```bash
+netbird up --management-url https://management.example.com --setup-key YOUR_SETUP_KEY
+```
+
+### Connect without Opening Browser
+
+Useful for headless servers:
+
+```bash
+netbird up --no-browser
+```
+
+You'll receive a URL to open manually for SSO authentication.
+
+### Set Custom Interface Name
+
+```bash
+netbird up --interface-name nb0
+```
+
+On macOS:
+```bash
+netbird up --interface-name utun5
+```
+
+### Configure External IP Mapping
+
+Useful when behind NAT:
+
+```bash
+netbird up --external-ip-map 203.0.113.50/10.0.1.100
+```
+
+### Set Custom Hostname
+
+```bash
+netbird up --hostname my-server-01
+```
+
+### Enable SSH Server
+
+Allow other peers to SSH into this machine:
+
+```bash
+netbird up --allow-server-ssh
+```
+
+With SFTP and port forwarding:
+
+```bash
+netbird up --allow-server-ssh --enable-ssh-sftp --enable-ssh-local-port-forwarding
+```
+
+### Disable Auto-Connect
+
+```bash
+netbird up --disable-auto-connect
+```
+
+### Use Environment Variables
+
+```bash
+export NB_SETUP_KEY="your-setup-key"
+export NB_MANAGEMENT_URL="https://management.example.com"
+netbird up
+```
+
+### Run in Foreground Mode
+
+Useful for testing or containers:
+
+```bash
+netbird up --foreground-mode --log-level debug
+```
+
+## Daemon vs Foreground Mode
+
+### Daemon Mode (Default)
+
+In daemon mode, `netbird up` connects to the NetBird system service:
+
+- The NetBird daemon must be running (`netbird service start`)
+- Connection persists after the command exits
+- System service manages the connection
+- Recommended for production use
+
+```bash
+netbird service install
+netbird service start
+netbird up
+```
+
+### Foreground Mode
+
+In foreground mode (`-F`), NetBird runs as a foreground process:
+
+- No system service required
+- Connection terminates when the process exits
+- Useful for testing, debugging, or containerized environments
+- Logs output to console by default
+
+```bash
+netbird up -F
+```
+
+## Authentication Methods
+
+### SSO (Interactive)
+
+Default method for interactive sessions:
+
+```bash
+netbird up
+```
+
+Opens your browser for SSO authentication (Google, Azure AD, Okta, etc.).
+
+### Setup Key (Non-Interactive)
+
+Ideal for automation, scripts, and headless servers:
+
+```bash
+netbird up --setup-key YOUR_SETUP_KEY
+```
+
+Setup keys can be:
+- Reusable or one-time use
+- Time-limited
+- Associated with specific groups
+- Created in the Management Dashboard
+
+See: [Register Machines Using Setup Keys](/api/setup-keys)
+
+## Status Messages
+
+- `Connected` - Successfully connected to the NetBird network
+- `Already connected` - The peer is already connected
+- `Daemon status: NeedsLogin` - Authentication required
+
+## Common Issues
+
+### Daemon Not Running
+
+```
+failed to connect to daemon error: connection refused
+If the daemon is not running please run:
+netbird service install
+netbird service start
+```
+
+**Solution:**
+```bash
+netbird service install
+netbird service start
+netbird up
+```
+
+### Port Already in Use
+
+If WireGuard port 51820 is already in use:
+
+```bash
+netbird up --wireguard-port 51821
+```
+
+### Interface Name Conflict
+
+If interface name `wt0` conflicts:
+
+```bash
+netbird up --interface-name nb0
+```
+
+## See Also
+
+- [netbird down](/cli/down) - Disconnect from the network
+- [netbird status](/cli/status) - Check connection status
+- [netbird service](/cli/service) - Manage the system service
+- [netbird login](/cli/login) - Authenticate without connecting

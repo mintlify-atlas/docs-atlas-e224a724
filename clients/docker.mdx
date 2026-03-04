@@ -1,0 +1,586 @@
+---
+title: Docker Client
+description: Run NetBird in Docker containers
+---
+
+NetBird can run inside Docker containers, enabling secure mesh networking for containerized applications. This is useful for connecting Docker containers across different hosts, accessing containers from your local machine, or integrating NetBird into CI/CD pipelines.
+
+## Quick Start
+
+Run NetBird in a Docker container:
+
+```bash
+docker run -d --name netbird \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_ADMIN \
+  --cap-add=SYS_RESOURCE \
+  -e NB_SETUP_KEY="<YOUR_SETUP_KEY>" \
+  -v netbird-client:/etc/netbird \
+  netbirdio/netbird:latest
+```
+
+## Docker Images
+
+NetBird provides two Docker images:
+
+<CardGroup cols={2}>
+  <Card title="Standard Image" icon="docker">
+    **Image:** `netbirdio/netbird:latest`
+    
+    - Requires `NET_ADMIN`, `SYS_ADMIN`, and `SYS_RESOURCE` capabilities
+    - Uses kernel WireGuard for better performance
+    - Full feature set
+  </Card>
+
+  <Card title="Rootless Image" icon="user-shield">
+    **Image:** `netbirdio/netbird:latest-rootless`
+    
+    - Runs as non-root user
+    - Uses userspace WireGuard (netstack)
+    - DNS disabled by default
+    - Suitable for restricted environments
+  </Card>
+</CardGroup>
+
+## Installation
+
+### Standard Container
+
+<Tabs>
+  <Tab title="With Setup Key">
+    ```bash
+    docker run -d --name netbird \
+      --restart unless-stopped \
+      --cap-add=NET_ADMIN \
+      --cap-add=SYS_ADMIN \
+      --cap-add=SYS_RESOURCE \
+      -e NB_SETUP_KEY="<YOUR_SETUP_KEY>" \
+      -e NB_HOSTNAME="docker-container" \
+      -v netbird-client:/etc/netbird \
+      netbirdio/netbird:latest
+    ```
+  </Tab>
+
+  <Tab title="With Management URL">
+    For self-hosted NetBird:
+
+    ```bash
+    docker run -d --name netbird \
+      --restart unless-stopped \
+      --cap-add=NET_ADMIN \
+      --cap-add=SYS_ADMIN \
+      --cap-add=SYS_RESOURCE \
+      -e NB_SETUP_KEY="<YOUR_SETUP_KEY>" \
+      -e NB_MANAGEMENT_URL="https://your-management-url.com" \
+      -e NB_HOSTNAME="docker-container" \
+      -v netbird-client:/etc/netbird \
+      netbirdio/netbird:latest
+    ```
+  </Tab>
+
+  <Tab title="Interactive Login">
+    For SSO authentication (requires interactive browser):
+
+    ```bash
+    docker run -it --name netbird \
+      --cap-add=NET_ADMIN \
+      --cap-add=SYS_ADMIN \
+      --cap-add=SYS_RESOURCE \
+      -v netbird-client:/etc/netbird \
+      netbirdio/netbird:latest
+    ```
+
+    Then inside the container:
+    ```bash
+    netbird up
+    ```
+  </Tab>
+</Tabs>
+
+### Rootless Container
+
+For environments where elevated privileges are not available:
+
+```bash
+docker run -d --name netbird-rootless \
+  --restart unless-stopped \
+  -e NB_SETUP_KEY="<YOUR_SETUP_KEY>" \
+  -e NB_HOSTNAME="docker-rootless" \
+  -v netbird-client:/var/lib/netbird \
+  netbirdio/netbird:latest-rootless
+```
+
+<Note>
+  The rootless image:
+  - Uses userspace WireGuard (slower than kernel WireGuard)
+  - Has DNS disabled by default (`NB_DISABLE_DNS=true`)
+  - Stores config in `/var/lib/netbird` instead of `/etc/netbird`
+  - Runs as user `netbird` (non-root)
+</Note>
+
+## Docker Compose
+
+Add NetBird to your `docker-compose.yml`:
+
+<CodeGroup>
+```yaml docker-compose.yml (Standard)
+version: '3.8'
+
+services:
+  netbird:
+    image: netbirdio/netbird:latest
+    container_name: netbird
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+    environment:
+      - NB_SETUP_KEY=${NETBIRD_SETUP_KEY}
+      - NB_MANAGEMENT_URL=${NETBIRD_MANAGEMENT_URL:-https://api.netbird.io}
+      - NB_HOSTNAME=${NETBIRD_HOSTNAME:-docker-netbird}
+      - NB_LOG_LEVEL=info
+      - NB_WIREGUARD_PORT=51820
+    volumes:
+      - netbird-data:/etc/netbird
+      - netbird-logs:/var/log/netbird
+
+volumes:
+  netbird-data:
+  netbird-logs:
+```
+
+```yaml docker-compose.yml (Rootless)
+version: '3.8'
+
+services:
+  netbird:
+    image: netbirdio/netbird:latest-rootless
+    container_name: netbird-rootless
+    restart: unless-stopped
+    environment:
+      - NB_SETUP_KEY=${NETBIRD_SETUP_KEY}
+      - NB_MANAGEMENT_URL=${NETBIRD_MANAGEMENT_URL:-https://api.netbird.io}
+      - NB_HOSTNAME=${NETBIRD_HOSTNAME:-docker-netbird}
+      - NB_LOG_LEVEL=info
+      - NB_USE_NETSTACK_MODE=true
+      - NB_ENABLE_NETSTACK_LOCAL_FORWARDING=true
+      - NB_DISABLE_DNS=true
+    volumes:
+      - netbird-data:/var/lib/netbird
+
+volumes:
+  netbird-data:
+```
+
+```env .env
+# Create a .env file with your settings
+NETBIRD_SETUP_KEY=your-setup-key-here
+NETBIRD_MANAGEMENT_URL=https://api.netbird.io
+NETBIRD_HOSTNAME=my-docker-host
+```
+</CodeGroup>
+
+Start the container:
+
+```bash
+docker-compose up -d
+```
+
+## Environment Variables
+
+Configure NetBird using environment variables:
+
+### Common Variables
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|--------|
+| `NB_SETUP_KEY` | Setup key for authentication | - | `A1B2C3D4E5F6...` |
+| `NB_MANAGEMENT_URL` | Management server URL | `https://api.netbird.io` | `https://netbird.example.com` |
+| `NB_HOSTNAME` | Custom hostname for the peer | Auto-generated | `docker-app-1` |
+| `NB_LOG_LEVEL` | Logging verbosity | `info` | `debug`, `warn`, `error` |
+| `NB_LOG_FILE` | Log file path | `console,/var/log/netbird/client.log` | `console` |
+| `NB_INTERFACE_NAME` | WireGuard interface name | `wt0` | `nb0` |
+| `NB_WIREGUARD_PORT` | WireGuard listening port | `51820` | `51821` |
+
+### Daemon Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NB_DAEMON_ADDR` | Daemon socket address | `unix:///var/run/netbird.sock` |
+| `NB_CONFIG` | Config file path | `/etc/netbird/config.json` |
+| `NB_STATE_DIR` | State directory | `/var/lib/netbird` |
+
+### Entrypoint Timing
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NB_ENTRYPOINT_SERVICE_TIMEOUT` | Seconds to wait for daemon startup | `5` |
+| `NB_ENTRYPOINT_LOGIN_TIMEOUT` | Seconds to wait for login check | `5` |
+
+### Rootless-Specific Variables
+
+| Variable | Description | Default (Rootless) |
+|----------|-------------|---------|
+| `NB_USE_NETSTACK_MODE` | Use userspace WireGuard | `true` |
+| `NB_ENABLE_NETSTACK_LOCAL_FORWARDING` | Enable local port forwarding | `true` |
+| `NB_DISABLE_DNS` | Disable DNS management | `true` |
+| `NB_CONFIG` | Config file path | `/var/lib/netbird/config.json` |
+| `NB_DAEMON_ADDR` | Daemon socket address | `unix:///var/lib/netbird/netbird.sock` |
+
+### Advanced Configuration
+
+| Variable | Description |
+|----------|-------------|
+| `NB_PRESHARED_KEY` | WireGuard pre-shared key for additional security |
+| `NB_EXTERNAL_IP_MAP` | External IP to local IP/interface mapping |
+| `NB_DNS_RESOLVER_ADDRESS` | Custom DNS resolver address |
+| `NB_DISABLE_AUTO_CONNECT` | Disable automatic connection on startup |
+| `NB_NETWORK_MONITOR` | Enable network change monitoring |
+| `NB_MTU` | Set custom MTU for WireGuard interface |
+
+## Required Capabilities
+
+### Standard Image
+
+The standard NetBird image requires these Linux capabilities:
+
+- **`NET_ADMIN`**: Create and manage network interfaces (WireGuard)
+- **`SYS_ADMIN`**: Mount and manage network namespaces
+- **`SYS_RESOURCE`**: Adjust resource limits for WireGuard
+
+**Do NOT use `--privileged`** unless absolutely necessary. The capabilities above are sufficient.
+
+### Rootless Image
+
+The rootless image requires **no special capabilities** but has limited functionality:
+
+- Uses userspace WireGuard (lower performance)
+- Cannot manage system DNS settings
+- Cannot create kernel network interfaces
+
+## Networking Considerations
+
+### Host Network Mode
+
+For optimal performance, consider using host networking:
+
+```bash
+docker run -d --name netbird \
+  --network host \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_ADMIN \
+  --cap-add=SYS_RESOURCE \
+  -e NB_SETUP_KEY="<YOUR_SETUP_KEY>" \
+  -v netbird-client:/etc/netbird \
+  netbirdio/netbird:latest
+```
+
+<Warning>
+  Host networking bypasses Docker's network isolation. Use with caution.
+</Warning>
+
+### Custom Bridge Network
+
+Connect NetBird to a custom Docker network:
+
+```bash
+# Create a custom network
+docker network create my-app-network
+
+# Run NetBird on this network
+docker run -d --name netbird \
+  --network my-app-network \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_ADMIN \
+  --cap-add=SYS_RESOURCE \
+  -e NB_SETUP_KEY="<YOUR_SETUP_KEY>" \
+  -v netbird-client:/etc/netbird \
+  netbirdio/netbird:latest
+
+# Other containers can now use NetBird
+docker run -d --name my-app \
+  --network my-app-network \
+  my-application:latest
+```
+
+### Exposing Ports
+
+If you need to expose specific ports from the container:
+
+```bash
+docker run -d --name netbird \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_ADMIN \
+  --cap-add=SYS_RESOURCE \
+  -e NB_SETUP_KEY="<YOUR_SETUP_KEY>" \
+  -p 51820:51820/udp \
+  -v netbird-client:/etc/netbird \
+  netbirdio/netbird:latest
+```
+
+## Volume Management
+
+### Persistent Storage
+
+NetBird needs persistent storage for configuration and state:
+
+```bash
+# Named volume (recommended)
+docker volume create netbird-data
+
+docker run -d --name netbird \
+  -v netbird-data:/etc/netbird \
+  ...
+```
+
+```bash
+# Bind mount (for direct access)
+mkdir -p /opt/netbird
+
+docker run -d --name netbird \
+  -v /opt/netbird:/etc/netbird \
+  ...
+```
+
+### Backing Up Configuration
+
+```bash
+# Export volume
+docker run --rm \
+  -v netbird-data:/data \
+  -v $(pwd):/backup \
+  alpine tar czf /backup/netbird-backup.tar.gz -C /data .
+
+# Restore volume
+docker run --rm \
+  -v netbird-data:/data \
+  -v $(pwd):/backup \
+  alpine tar xzf /backup/netbird-backup.tar.gz -C /data
+```
+
+## Checking Container Status
+
+```bash
+# Check if NetBird is running
+docker ps -f name=netbird
+
+# View NetBird logs
+docker logs netbird -f
+
+# Execute netbird status inside container
+docker exec netbird netbird status
+
+# Get detailed peer information
+docker exec netbird netbird status --detail
+
+# Get NetBird IP address
+docker exec netbird netbird status --ipv4
+```
+
+## Advanced Use Cases
+
+### Kubernetes/K8s
+
+Run NetBird as a sidecar or DaemonSet in Kubernetes:
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: netbird
+spec:
+  selector:
+    matchLabels:
+      app: netbird
+  template:
+    metadata:
+      labels:
+        app: netbird
+    spec:
+      hostNetwork: true
+      containers:
+      - name: netbird
+        image: netbirdio/netbird:latest
+        securityContext:
+          capabilities:
+            add:
+              - NET_ADMIN
+              - SYS_ADMIN
+              - SYS_RESOURCE
+        env:
+        - name: NB_SETUP_KEY
+          valueFrom:
+            secretKeyRef:
+              name: netbird-secret
+              key: setup-key
+        - name: NB_HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - name: netbird-data
+          mountPath: /etc/netbird
+      volumes:
+      - name: netbird-data
+        hostPath:
+          path: /var/lib/netbird
+          type: DirectoryOrCreate
+```
+
+### CI/CD Pipelines
+
+Use NetBird in CI/CD to access private resources:
+
+```yaml
+# GitLab CI example
+test:
+  image: netbirdio/netbird:latest
+  variables:
+    NB_SETUP_KEY: $NETBIRD_SETUP_KEY
+  script:
+    - netbird up --setup-key $NB_SETUP_KEY
+    - sleep 5  # Wait for connection
+    - curl http://internal-service.netbird.cloud
+    - netbird down
+```
+
+### Multi-Container Setup
+
+Share NetBird network with other containers:
+
+```yaml
+version: '3.8'
+
+services:
+  netbird:
+    image: netbirdio/netbird:latest
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+    environment:
+      - NB_SETUP_KEY=${NETBIRD_SETUP_KEY}
+    volumes:
+      - netbird-data:/etc/netbird
+
+  app:
+    image: my-application:latest
+    network_mode: "service:netbird"
+    depends_on:
+      - netbird
+
+volumes:
+  netbird-data:
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Container fails to start">
+    Check if required capabilities are added:
+    ```bash
+    docker inspect netbird | grep -A 5 CapAdd
+    ```
+
+    Verify setup key is set:
+    ```bash
+    docker exec netbird env | grep NB_SETUP_KEY
+    ```
+  </Accordion>
+
+  <Accordion title="Cannot connect to peers">
+    Check container logs:
+    ```bash
+    docker logs netbird --tail 100
+    ```
+
+    Verify NetBird status:
+    ```bash
+    docker exec netbird netbird status
+    ```
+
+    Check WireGuard interface:
+    ```bash
+    docker exec netbird ip addr show wt0
+    ```
+  </Accordion>
+
+  <Accordion title="DNS not working">
+    For standard image, check DNS configuration:
+    ```bash
+    docker exec netbird cat /etc/resolv.conf
+    ```
+
+    For rootless image, DNS is disabled by default. Enable with:
+    ```bash
+    -e NB_DISABLE_DNS=false
+    ```
+  </Accordion>
+
+  <Accordion title="Permission denied errors">
+    Ensure required capabilities are added:
+    ```bash
+    --cap-add=NET_ADMIN --cap-add=SYS_ADMIN --cap-add=SYS_RESOURCE
+    ```
+
+    For rootless environments, use the rootless image:
+    ```bash
+    netbirdio/netbird:latest-rootless
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Enable Debug Logging
+
+```bash
+# Restart with debug logging
+docker stop netbird
+docker rm netbird
+
+docker run -d --name netbird \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_ADMIN \
+  --cap-add=SYS_RESOURCE \
+  -e NB_SETUP_KEY="<YOUR_SETUP_KEY>" \
+  -e NB_LOG_LEVEL=debug \
+  -v netbird-client:/etc/netbird \
+  netbirdio/netbird:latest
+
+# View debug logs
+docker logs netbird -f
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Named Volumes" icon="database">
+    Store configuration in named Docker volumes for easy backup and portability.
+  </Card>
+
+  <Card title="Set Restart Policy" icon="rotate">
+    Use `--restart unless-stopped` to ensure NetBird survives container restarts.
+  </Card>
+
+  <Card title="Use Environment Variables" icon="gear">
+    Store sensitive data like setup keys in `.env` files or secrets managers.
+  </Card>
+
+  <Card title="Monitor Logs" icon="file-lines">
+    Regularly check logs for connection issues or errors.
+  </Card>
+</CardGroup>
+
+## Cleaning Up
+
+```bash
+# Stop and remove container
+docker stop netbird
+docker rm netbird
+
+# Remove volume (WARNING: deletes configuration)
+docker volume rm netbird-data
+
+# Remove image
+docker rmi netbirdio/netbird:latest
+```

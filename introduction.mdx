@@ -1,0 +1,186 @@
+---
+title: What is NetBird?
+description: Learn about NetBird's peer-to-peer WireGuard VPN platform for secure network connectivity
+---
+
+NetBird is an open-source platform that combines a configuration-free peer-to-peer private network with centralized access control, making it easy to create secure private networks for your organization or home.
+
+## How NetBird Works
+
+NetBird creates a **WireGuard-based overlay network** that automatically connects your machines over an encrypted tunnel. It eliminates the complexity of traditional VPN setups—no port forwarding, no complex firewall rules, no VPN gateways.
+
+### Core Architecture
+
+NetBird uses a modern, distributed architecture:
+
+- **NetBird Agent (Client)**: Runs on each machine and manages the WireGuard interface
+- **Management Service**: Holds network state, manages peer IPs, and distributes network updates
+- **Signal Service**: Facilitates peer-to-peer connection negotiation using WebRTC ICE
+- **STUN/TURN Servers**: Enable NAT traversal for peer-to-peer connectivity
+
+<Note>
+Every machine in your network runs the NetBird agent, which handles all the complexity of establishing secure peer-to-peer connections automatically.
+</Note>
+
+### Peer-to-Peer Connectivity
+
+NetBird establishes **direct, encrypted connections** between your machines whenever possible:
+
+1. The NetBird agent uses **WebRTC ICE** (implemented via [pion/ice](https://github.com/pion/ice)) to discover connection candidates
+2. Connection candidates are discovered with the help of **STUN servers**
+3. Agents negotiate connections through the **Signal Service**, passing peer-to-peer encrypted messages
+4. When direct connection isn't possible (due to strict NATs like carrier-grade NAT), the system falls back to a **TURN relay server**
+5. All traffic is secured with **kernel WireGuard** for maximum performance and security
+
+<Info>
+NetBird leverages kernel WireGuard for peer-to-peer encryption, ensuring your traffic is protected even when routed through relay servers.
+</Info>
+
+## Key Benefits
+
+### Connect
+
+NetBird creates secure connections without the typical VPN hassles:
+
+- **Zero configuration**: No manual IP assignment or routing rules
+- **Automatic peer discovery**: Machines find each other automatically
+- **NAT traversal**: Works behind firewalls and NATs using BPF-based techniques
+- **Connection relay fallback**: Automatically switches to TURN relay when direct connection fails
+
+### Secure
+
+Enterprise-grade security with modern cryptography:
+
+- **Peer-to-peer encryption**: End-to-end WireGuard tunnels between peers
+- **SSO & MFA support**: Integrate with your identity provider (Google, Microsoft, Okta, etc.)
+- **Granular access control**: Define who can access what using groups and rules
+- **Device posture checks**: Verify device compliance before granting access
+- **Quantum-resistance**: Optional [Rosenpass](https://rosenpass.eu) integration for post-quantum security
+- **Activity logging**: Complete audit trail of network access
+
+### Manage
+
+Centralized management with distributed performance:
+
+- **Web-based dashboard**: Manage your entire network from a single interface
+- **Multi-user support**: Collaborate with your team using role-based access
+- **Private DNS**: Assign and resolve custom domain names for your peers
+- **Network routing**: Route traffic to external networks and private subnets
+- **Setup keys**: Provision machines at scale without manual intervention
+- **Public API**: Automate network operations programmatically
+
+## Common Use Cases
+
+### Remote Access
+
+Provide secure access to corporate resources for remote employees:
+
+- Connect to internal servers and databases
+- Access development environments from anywhere
+- Secure access to cloud resources across regions
+
+### Infrastructure Connectivity
+
+Connect infrastructure across multiple environments:
+
+- Link on-premises data centers with cloud infrastructure
+- Create secure mesh networks between Kubernetes clusters
+- Connect IoT devices and edge computing nodes
+
+### Development & DevOps
+
+Streamline development workflows:
+
+- Access staging and development environments
+- Secure CI/CD pipelines across environments
+- Connect to databases and internal tools
+
+### Site-to-Site Networking
+
+Replace expensive MPLS circuits with encrypted peer-to-peer links:
+
+- Connect branch offices
+- Hybrid cloud networking
+- Multi-cloud connectivity
+
+### Personal Use
+
+Secure your personal devices and home network:
+
+- Secure access to home lab and self-hosted services
+- Private file sharing between devices
+- Encrypted connections on public WiFi
+
+## NetBird vs Traditional VPN
+
+| Feature | NetBird | Traditional VPN |
+| --- | --- | --- |
+| **Architecture** | Peer-to-peer mesh | Hub-and-spoke |
+| **Performance** | Direct connections, low latency | Traffic through central gateway |
+| **Configuration** | Zero-config, automatic | Manual IP assignment, routing |
+| **NAT Traversal** | Built-in with ICE | Requires port forwarding |
+| **Access Control** | Centralized, granular | Often all-or-nothing |
+| **Scalability** | Distributed, no bottleneck | Limited by gateway capacity |
+| **Management** | Web UI + API | Often CLI-based |
+
+## Platform Support
+
+NetBird runs on all major platforms:
+
+- **Linux**: Debian, Ubuntu, RHEL, CentOS, Fedora, Arch, NixOS, OpenWRT
+- **macOS**: Intel and Apple Silicon
+- **Windows**: Windows 10 and later
+- **Mobile**: Android and iOS
+- **Docker**: Official container images
+- **Serverless**: AWS Lambda, Google Cloud Functions
+
+## Getting Started
+
+Ready to try NetBird? Here are your options:
+
+### NetBird Cloud
+
+The fastest way to get started—managed infrastructure, zero setup:
+
+- Sign up at [app.netbird.io](https://app.netbird.io)
+- Install the client on your devices
+- Connect and start using your private network
+
+### Self-Hosted
+
+Full control over your infrastructure:
+
+- Deploy on your own servers or cloud
+- Choose your identity provider
+- Customize to your requirements
+
+See the [Quickstart](/quickstart) guide to get up and running in 5 minutes, or check [Installation](/installation) for detailed platform-specific instructions.
+
+<Info>
+Both NetBird Cloud and self-hosted deployments use the same client software and offer identical features.
+</Info>
+
+## Open Source
+
+NetBird is open source and built on proven technologies:
+
+- **License**: BSD-3-Clause (client), AGPLv3 (server components)
+- **Built with**: [WireGuard](https://www.wireguard.com/), [Pion ICE](https://github.com/pion/ice), [Coturn](https://github.com/coturn/coturn)
+- **Repository**: [github.com/netbirdio/netbird](https://github.com/netbirdio/netbird)
+- **Community**: [Slack](https://docs.netbird.io/slack-url) | [Forum](https://forum.netbird.io)
+
+## Next Steps
+
+<Steps>
+  <Step title="Try the Quickstart">
+    Get NetBird running in 5 minutes with our [Quickstart guide](/quickstart)
+  </Step>
+  
+  <Step title="Install on Your Platform">
+    Follow platform-specific instructions in the [Installation guide](/installation)
+  </Step>
+  
+  <Step title="Explore Features">
+    Learn about advanced features like access control, routing, and DNS
+  </Step>
+</Steps>

@@ -1,0 +1,620 @@
+---
+title: Installation
+description: Install NetBird on Linux, macOS, Windows, Docker, and other platforms
+---
+
+This guide covers installing the NetBird client on all supported platforms. The client consists of two components:
+
+- **netbird**: The CLI and background daemon that manages the WireGuard interface
+- **netbird-ui**: The optional desktop GUI application
+
+<Info>
+All installation methods install both the CLI and daemon. The UI is optional and only installed on desktop environments.
+</Info>
+
+## Linux
+
+NetBird supports all major Linux distributions through native packages and a universal installation script.
+
+### One-Line Installer (Recommended)
+
+The quickest way to install on any Linux system:
+
+```bash
+curl -fsSL https://pkgs.netbird.io/install.sh | sh
+```
+
+**What it does:**
+- Detects your distribution and package manager
+- Adds the official NetBird repository
+- Installs `netbird` and `netbird-ui` (on desktop systems)
+- Sets up and starts the NetBird service
+
+**Environment variables:**
+
+```bash
+# Skip UI installation (for servers/headless systems)
+SKIP_UI_APP=true curl -fsSL https://pkgs.netbird.io/install.sh | sh
+
+# Force binary installation (skip package manager)
+USE_BIN_INSTALL=true curl -fsSL https://pkgs.netbird.io/install.sh | sh
+
+# Install specific version
+NETBIRD_RELEASE=v0.28.0 curl -fsSL https://pkgs.netbird.io/install.sh | sh
+```
+
+### Debian/Ubuntu (apt)
+
+For Debian, Ubuntu, and derivatives:
+
+```bash
+# Add NetBird repository
+sudo apt-get update
+sudo apt-get install ca-certificates curl gnupg -y
+
+curl -sSL https://pkgs.netbird.io/debian/public.key | \
+  sudo gpg --dearmor -o /usr/share/keyrings/netbird-archive-keyring.gpg
+
+echo 'deb [signed-by=/usr/share/keyrings/netbird-archive-keyring.gpg] https://pkgs.netbird.io/debian stable main' | \
+  sudo tee /etc/apt/sources.list.d/netbird.list
+
+sudo apt-get update
+
+# Install NetBird
+sudo apt-get install netbird -y
+
+# Install UI (optional, desktop only)
+sudo apt-get install netbird-ui -y
+```
+
+### RHEL/CentOS/Fedora (yum/dnf)
+
+For RedHat-based distributions:
+
+```bash
+# Add NetBird repository
+sudo tee /etc/yum.repos.d/netbird.repo <<EOF
+[NetBird]
+name=NetBird
+baseurl=https://pkgs.netbird.io/yum/
+enabled=1
+gpgcheck=0
+gpgkey=https://pkgs.netbird.io/yum/repodata/repomd.xml.key
+repo_gpgcheck=1
+EOF
+
+# Install with dnf (Fedora, RHEL 8+)
+sudo dnf install netbird -y
+sudo dnf install netbird-ui -y  # Optional
+
+# Or with yum (RHEL 7, CentOS 7)
+sudo yum install netbird -y
+sudo yum install netbird-ui -y  # Optional
+```
+
+### Fedora Silverblue/rpm-ostree
+
+For immutable Fedora variants:
+
+```bash
+# Add repository (same as above)
+sudo tee /etc/yum.repos.d/netbird.repo <<EOF
+[NetBird]
+name=NetBird
+baseurl=https://pkgs.netbird.io/yum/
+enabled=1
+gpgcheck=0
+gpgkey=https://pkgs.netbird.io/yum/repodata/repomd.xml.key
+repo_gpgcheck=1
+EOF
+
+# Install NetBird
+sudo rpm-ostree install netbird
+sudo rpm-ostree install netbird-ui  # Optional
+
+# Reboot to apply changes
+sudo systemctl reboot
+```
+
+<Note>
+The service is automatically started after installation on rpm-ostree systems.
+</Note>
+
+### NixOS
+
+Add to your `configuration.nix`:
+
+```nix
+{
+  # Enable NetBird service
+  services.netbird.enable = true;
+  
+  # Optional: Install UI
+  environment.systemPackages = [ pkgs.netbird-ui ];
+}
+```
+
+Then rebuild your system:
+
+```bash
+sudo nixos-rebuild switch
+```
+
+### Arch Linux
+
+NetBird is available in the AUR:
+
+```bash
+# Using yay
+yay -S netbird
+
+# Or using paru
+paru -S netbird
+```
+
+### Binary Installation (Any Linux)
+
+For distributions without package manager support:
+
+```bash
+# Download and extract
+VERSION=$(curl -s https://pkgs.netbird.io/releases/latest | grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+')
+ARCH=$(uname -m)
+case $ARCH in
+  x86_64) ARCH="amd64" ;;
+  aarch64) ARCH="arm64" ;;
+  armv7l) ARCH="armv7" ;;
+esac
+
+curl -LO https://github.com/netbirdio/netbird/releases/download/${VERSION}/netbird_${VERSION#v}_linux_${ARCH}.tar.gz
+tar -xzf netbird_${VERSION#v}_linux_${ARCH}.tar.gz
+
+# Install to system
+sudo mv netbird /usr/bin/
+sudo chmod +x /usr/bin/netbird
+
+# Install and start service
+sudo netbird service install
+sudo netbird service start
+```
+
+## macOS
+
+### One-Line Installer (Recommended)
+
+The universal installer works on both Intel and Apple Silicon:
+
+```bash
+curl -fsSL https://pkgs.netbird.io/install.sh | sh
+```
+
+This downloads and installs the `.pkg` installer, which includes both the CLI and GUI app.
+
+### Homebrew
+
+Install via Homebrew:
+
+```bash
+# Add NetBird tap
+brew tap netbirdio/tap
+
+# Install NetBird CLI and daemon
+brew install netbird
+
+# Install NetBird UI (optional)
+brew install --cask netbird-ui
+```
+
+### Manual Installation
+
+Download the installer for your architecture:
+
+**Apple Silicon (M1/M2/M3):**
+```bash
+curl -L https://pkgs.netbird.io/macos/arm64 -o netbird.pkg
+sudo installer -pkg netbird.pkg -target /
+```
+
+**Intel:**
+```bash
+curl -L https://pkgs.netbird.io/macos/amd64 -o netbird.pkg
+sudo installer -pkg netbird.pkg -target /
+```
+
+### Starting the Service
+
+The service is installed automatically but may need to be started:
+
+```bash
+netbird service install
+netbird service start
+```
+
+<Note>
+On macOS, WireGuard interfaces must use the `utun` prefix (e.g., `utun5`, `utun99`). This is handled automatically by default.
+</Note>
+
+## Windows
+
+### GUI Installer (Recommended)
+
+1. Download the installer from [app.netbird.io/install](https://app.netbird.io/install)
+2. Run the `.exe` file
+3. Follow the installation wizard
+4. NetBird will start automatically after installation
+
+### PowerShell (Command Line)
+
+Download and run from PowerShell (as Administrator):
+
+```powershell
+# Download installer
+Invoke-WebRequest -Uri https://pkgs.netbird.io/windows/x64 -OutFile netbird-installer.exe
+
+# Run installer
+.\netbird-installer.exe /S  # /S for silent install
+```
+
+### Manual Installation
+
+1. Download from [GitHub Releases](https://github.com/netbirdio/netbird/releases/latest)
+2. Look for `netbird_installer_<version>_windows_amd64.exe`
+3. Run the installer
+
+### Starting the Service
+
+The Windows service starts automatically. To manage it:
+
+```powershell
+# Check status
+netbird service status
+
+# Start service
+netbird service start
+
+# Stop service
+netbird service stop
+```
+
+## Docker
+
+Run NetBird in a Docker container:
+
+### Interactive Mode
+
+```bash
+docker run -d --name netbird \
+  --network host \
+  --cap-add NET_ADMIN \
+  --cap-add SYS_ADMIN \
+  --cap-add SYS_RESOURCE \
+  -v netbird-client:/etc/netbird \
+  -e NB_MANAGEMENT_URL=https://api.netbird.io:443 \
+  netbirdio/netbird:latest up
+```
+
+### With Setup Key (Automation)
+
+```bash
+docker run -d --name netbird \
+  --network host \
+  --cap-add NET_ADMIN \
+  --cap-add SYS_ADMIN \
+  --cap-add SYS_RESOURCE \
+  -v netbird-client:/etc/netbird \
+  -e NB_SETUP_KEY=<YOUR_SETUP_KEY> \
+  -e NB_MANAGEMENT_URL=https://api.netbird.io:443 \
+  netbirdio/netbird:latest up
+```
+
+### Docker Compose
+
+```yaml
+version: '3.8'
+
+services:
+  netbird:
+    image: netbirdio/netbird:latest
+    container_name: netbird
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+    volumes:
+      - netbird-client:/etc/netbird
+    environment:
+      - NB_SETUP_KEY=${NETBIRD_SETUP_KEY}
+      - NB_MANAGEMENT_URL=https://api.netbird.io:443
+      - NB_LOG_LEVEL=info
+    command: up
+    restart: unless-stopped
+
+volumes:
+  netbird-client:
+```
+
+<Warning>
+Docker deployments require `--network host` mode because NetBird needs to create a WireGuard interface on the host network namespace.
+</Warning>
+
+**Environment Variables:**
+
+- `NB_SETUP_KEY`: Setup key for authentication (alternative to SSO)
+- `NB_MANAGEMENT_URL`: Management server URL (default: NetBird Cloud)
+- `NB_LOG_LEVEL`: Logging level (debug, info, warn, error)
+- `NB_INTERFACE_NAME`: WireGuard interface name (default: wt0)
+- `NB_WIREGUARD_PORT`: WireGuard listen port (default: 51820)
+
+### Rootless Docker (Experimental)
+
+For rootless Docker environments:
+
+```bash
+docker run -d --name netbird \
+  --network host \
+  -v netbird-client:/etc/netbird \
+  -e NB_SETUP_KEY=<YOUR_SETUP_KEY> \
+  netbirdio/netbird:latest-rootless up
+```
+
+## Android & iOS
+
+### Android
+
+Install from Google Play Store:
+
+1. Search for "NetBird" in the Play Store
+2. Install the app
+3. Open and sign in with your NetBird account
+4. Tap "Connect" to establish the VPN
+
+Or download the APK from [GitHub Releases](https://github.com/netbirdio/android-client/releases).
+
+### iOS
+
+Install from Apple App Store:
+
+1. Search for "NetBird" in the App Store
+2. Install the app
+3. Open and sign in with your NetBird account
+4. Grant VPN permissions when prompted
+5. Tap "Connect" to establish the VPN
+
+## OpenWRT
+
+For OpenWRT routers:
+
+```bash
+# Install dependencies
+opkg update
+opkg install kmod-wireguard-tools wireguard-tools
+
+# Download NetBird binary
+wget https://github.com/netbirdio/netbird/releases/latest/download/netbird_<version>_linux_arm.tar.gz
+tar -xzf netbird_<version>_linux_arm.tar.gz -C /usr/bin/
+
+# Make executable
+chmod +x /usr/bin/netbird
+
+# Start NetBird with setup key
+netbird up --setup-key <YOUR_SETUP_KEY> --allow-server-ssh
+```
+
+<Note>
+Replace `<version>` with the actual version number and `arm` with your architecture (arm, arm64, mips, etc.).
+</Note>
+
+## Post-Installation
+
+After installing on any platform:
+
+### 1. Start the Service
+
+```bash
+netbird service install
+netbird service start
+```
+
+### 2. Connect to NetBird
+
+```bash
+# With SSO (interactive)
+netbird up
+
+# With setup key (automation)
+netbird up --setup-key <YOUR_SETUP_KEY>
+
+# Self-hosted management server
+netbird up --management-url https://netbird.example.com:443
+```
+
+### 3. Verify Connection
+
+```bash
+netbird status
+```
+
+## Updating NetBird
+
+### Linux (Package Manager)
+
+```bash
+# Debian/Ubuntu
+sudo apt-get update && sudo apt-get upgrade netbird
+
+# RHEL/Fedora
+sudo dnf upgrade netbird
+```
+
+### Linux (Binary Installation)
+
+```bash
+# Using the install script with UPDATE flag
+UPDATE_NETBIRD=true curl -fsSL https://pkgs.netbird.io/install.sh | sh
+
+# Or manually
+netbird version  # Check current version
+# Download new version and replace /usr/bin/netbird
+sudo netbird service restart
+```
+
+### macOS (Homebrew)
+
+```bash
+brew upgrade netbird
+brew upgrade netbird-ui
+```
+
+### Windows
+
+Download and run the latest installer—it will upgrade the existing installation.
+
+### Docker
+
+```bash
+# Pull latest image
+docker pull netbirdio/netbird:latest
+
+# Restart container
+docker restart netbird
+```
+
+## Uninstalling NetBird
+
+### Linux (Package Manager)
+
+```bash
+# Stop and remove service
+netbird service stop
+netbird service uninstall
+
+# Debian/Ubuntu
+sudo apt-get remove netbird netbird-ui
+
+# RHEL/Fedora
+sudo dnf remove netbird netbird-ui
+
+# Remove configuration (optional)
+sudo rm -rf /etc/netbird
+```
+
+### macOS (Homebrew)
+
+```bash
+# Stop service
+netbird service stop
+netbird service uninstall
+
+# Uninstall packages
+brew uninstall netbird
+brew uninstall --cask netbird-ui
+
+# Remove configuration (optional)
+sudo rm -rf /etc/netbird
+```
+
+### Windows
+
+Use "Add or Remove Programs" in Windows Settings, or run the uninstaller from the installation directory.
+
+## Advanced Configuration
+
+### Custom Interface Name
+
+```bash
+netbird up --interface-name nb0
+```
+
+### Custom WireGuard Port
+
+```bash
+netbird up --wireguard-port 51821
+```
+
+### MTU Configuration
+
+```bash
+netbird up --mtu 1400
+```
+
+### Disable Auto-Connect
+
+```bash
+netbird up --disable-auto-connect
+```
+
+### Enable Debug Logging
+
+```bash
+netbird up --log-level debug
+```
+
+### Rosenpass (Quantum Resistance)
+
+```bash
+netbird up --enable-rosenpass
+```
+
+## Troubleshooting
+
+### Service Won't Start
+
+```bash
+# Check service logs (Linux with systemd)
+sudo journalctl -u netbird -f
+
+# Check service status
+netbird service status
+
+# Reinstall service
+netbird service uninstall
+netbird service install
+netbird service start
+```
+
+### Permission Issues (Linux)
+
+```bash
+# Ensure WireGuard kernel module is loaded
+sudo modprobe wireguard
+
+# Check for TUN device
+ls -l /dev/net/tun
+
+# If missing, create it
+sudo mkdir -p /dev/net
+sudo mknod /dev/net/tun c 10 200
+sudo chmod 0755 /dev/net/tun
+```
+
+### Connection Issues
+
+```bash
+# Test management server connectivity
+curl -I https://api.netbird.io:443
+
+# Check firewall rules (ensure UDP 3478 is open for STUN)
+sudo ufw allow 3478/udp  # Ubuntu/Debian
+sudo firewall-cmd --add-port=3478/udp --permanent  # RHEL/CentOS
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Connect your first devices in 5 minutes
+  </Card>
+  
+  <Card title="Access Control" icon="shield-halved" href="/network/access-control">
+    Configure groups and access rules
+  </Card>
+  
+  <Card title="Private DNS" icon="globe" href="/network/dns">
+    Set up custom DNS names for your network
+  </Card>
+  
+  <Card title="Network Routing" icon="route" href="/network/routes">
+    Route traffic to external networks
+  </Card>
+</CardGroup>

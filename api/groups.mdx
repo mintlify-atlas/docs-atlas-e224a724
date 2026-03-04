@@ -1,0 +1,349 @@
+---
+title: Groups API
+description: Organize peers and users into groups
+---
+
+Groups are used to organize peers and resources, making it easier to apply policies, routes, and access controls across multiple devices.
+
+## List All Groups
+
+Returns a list of all groups in your network.
+
+```bash
+GET /api/groups
+```
+
+<ParamField query="name" type="string">
+  Filter groups by name (exact match)
+</ParamField>
+
+<CodeGroup>
+```bash All Groups
+curl -X GET https://api.netbird.io/api/groups \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```bash Filter by Name
+curl -X GET "https://api.netbird.io/api/groups?name=developers" \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```json Response
+[
+  {
+    "id": "ch8i4ug6lnn4g9hqv7m0",
+    "name": "developers",
+    "peers_count": 5,
+    "resources_count": 3,
+    "issued": "api",
+    "peers": [
+      {
+        "id": "chacbco6lnnbn6cg5s90",
+        "name": "laptop-01"
+      },
+      {
+        "id": "chacbco6lnnbn6cg5s91",
+        "name": "desktop-02"
+      }
+    ],
+    "resources": [
+      {
+        "id": "res_123",
+        "type": "host"
+      }
+    ]
+  }
+]
+```
+</CodeGroup>
+
+<ResponseField name="id" type="string">
+  Unique group identifier
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Group name
+</ResponseField>
+
+<ResponseField name="peers_count" type="integer">
+  Number of peers in this group
+</ResponseField>
+
+<ResponseField name="resources_count" type="integer">
+  Number of resources in this group
+</ResponseField>
+
+<ResponseField name="issued" type="string">
+  How the group was created: `api`, `integration`, or `jwt`
+</ResponseField>
+
+<ResponseField name="peers" type="array">
+  List of peer objects in the group
+</ResponseField>
+
+<ResponseField name="resources" type="array">
+  List of resource objects in the group
+</ResponseField>
+
+## Get a Group
+
+Retrieve detailed information about a specific group.
+
+```bash
+GET /api/groups/{groupId}
+```
+
+<ParamField path="groupId" type="string" required>
+  The unique identifier of the group
+</ParamField>
+
+```bash Example
+curl -X GET https://api.netbird.io/api/groups/ch8i4ug6lnn4g9hqv7m0 \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+## Create a Group
+
+Create a new group with specified peers and resources.
+
+```bash
+POST /api/groups
+```
+
+<ParamField body="name" type="string" required>
+  Group name identifier
+</ParamField>
+
+<ParamField body="peers" type="array">
+  List of peer IDs to add to the group
+</ParamField>
+
+<ParamField body="resources" type="array">
+  List of resource objects to add to the group
+</ParamField>
+
+<CodeGroup>
+```bash Create Group
+curl -X POST https://api.netbird.io/api/groups \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "production-servers",
+    "peers": [
+      "chacbco6lnnbn6cg5s90",
+      "chacbco6lnnbn6cg5s91"
+    ],
+    "resources": [
+      {
+        "id": "peer_abc123",
+        "type": "peer"
+      }
+    ]
+  }'
+```
+
+```json Response
+{
+  "id": "ch8i4ug6lnn4g9hqv7m1",
+  "name": "production-servers",
+  "peers_count": 2,
+  "resources_count": 1,
+  "issued": "api",
+  "peers": [
+    {
+      "id": "chacbco6lnnbn6cg5s90",
+      "name": "server-01"
+    },
+    {
+      "id": "chacbco6lnnbn6cg5s91",
+      "name": "server-02"
+    }
+  ],
+  "resources": [
+    {
+      "id": "peer_abc123",
+      "type": "peer"
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Update a Group
+
+Update group name, peers, or resources.
+
+```bash
+PUT /api/groups/{groupId}
+```
+
+<ParamField path="groupId" type="string" required>
+  The unique identifier of the group
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Group name identifier
+</ParamField>
+
+<ParamField body="peers" type="array">
+  Complete list of peer IDs (replaces existing peers)
+</ParamField>
+
+<ParamField body="resources" type="array">
+  Complete list of resource objects (replaces existing resources)
+</ParamField>
+
+<CodeGroup>
+```bash Update Group
+curl -X PUT https://api.netbird.io/api/groups/ch8i4ug6lnn4g9hqv7m0 \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "production-servers-updated",
+    "peers": [
+      "chacbco6lnnbn6cg5s90",
+      "chacbco6lnnbn6cg5s91",
+      "chacbco6lnnbn6cg5s92"
+    ],
+    "resources": []
+  }'
+```
+
+```json Response
+{
+  "id": "ch8i4ug6lnn4g9hqv7m0",
+  "name": "production-servers-updated",
+  "peers_count": 3,
+  "resources_count": 0,
+  "peers": [
+    {"id": "chacbco6lnnbn6cg5s90", "name": "server-01"},
+    {"id": "chacbco6lnnbn6cg5s91", "name": "server-02"},
+    {"id": "chacbco6lnnbn6cg5s92", "name": "server-03"}
+  ],
+  "resources": []
+}
+```
+</CodeGroup>
+
+<Warning>
+Updating a group replaces the entire peer and resource lists. Make sure to include all peers and resources you want to keep.
+</Warning>
+
+## Delete a Group
+
+Remove a group from the network.
+
+```bash
+DELETE /api/groups/{groupId}
+```
+
+<ParamField path="groupId" type="string" required>
+  The unique identifier of the group
+</ParamField>
+
+```bash Example
+curl -X DELETE https://api.netbird.io/api/groups/ch8i4ug6lnn4g9hqv7m0 \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+<Note>
+Deleting a group will:
+- Remove the group from all policies
+- Remove the group from all routes
+- Remove the group from user auto-groups
+- NOT delete the peers or resources in the group
+</Note>
+
+## Group Types
+
+Groups can be created through different methods:
+
+<CardGroup cols={3}>
+  <Card title="API Groups" icon="code">
+    Created and managed via the API or dashboard
+  </Card>
+  <Card title="Integration Groups" icon="plug">
+    Automatically synced from identity providers (Okta, Azure AD, etc.)
+  </Card>
+  <Card title="JWT Groups" icon="key">
+    Extracted from JWT claims during user authentication
+  </Card>
+</CardGroup>
+
+## Common Use Cases
+
+### Organizing by Department
+
+Create groups for different teams:
+
+```bash
+# Engineering team
+curl -X POST https://api.netbird.io/api/groups \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "engineering", "peers": [...]}'
+
+# Sales team
+curl -X POST https://api.netbird.io/api/groups \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "sales", "peers": [...]}'
+```
+
+### Organizing by Environment
+
+Separate production, staging, and development:
+
+```bash
+curl -X POST https://api.netbird.io/api/groups \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "production",
+    "peers": ["prod-server-01", "prod-server-02"]
+  }'
+```
+
+### Organizing by Location
+
+Group peers by geographic location:
+
+```bash
+curl -X POST https://api.netbird.io/api/groups \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "us-east",
+    "peers": [...]
+  }'
+```
+
+## Resource Types
+
+Groups can contain different resource types:
+
+<ParamField body="type" type="string">
+  Resource type: `peer`, `host`, `subnet`, or `domain`
+</ParamField>
+
+<ParamField body="id" type="string">
+  Unique resource identifier
+</ParamField>
+
+```json Example Resources
+{
+  "resources": [
+    {"id": "peer_abc", "type": "peer"},
+    {"id": "host_xyz", "type": "host"},
+    {"id": "net_123", "type": "subnet"}
+  ]
+}
+```
+
+## Best Practices
+
+<Check>**Use descriptive names** - Name groups based on their purpose (e.g., "engineering-laptops", "production-databases")</Check>
+<Check>**Keep groups focused** - Create smaller, specific groups rather than large, generic ones</Check>
+<Check>**Document group purpose** - Maintain documentation on what each group represents</Check>
+<Check>**Regular audits** - Periodically review group memberships to ensure accuracy</Check>
+<Check>**Use integration groups** - Leverage identity provider groups when possible for automatic synchronization</Check>

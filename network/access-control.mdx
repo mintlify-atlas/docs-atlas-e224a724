@@ -1,0 +1,182 @@
+---
+title: Access Control
+description: Understanding NetBird's zero-trust access control model
+---
+
+# Access Control
+
+NetBird implements a **zero-trust security model** with default deny behavior. This means that no peer can communicate with another peer unless explicitly allowed by an access policy.
+
+## Default Deny Architecture
+
+Unlike traditional VPNs that grant broad network access, NetBird follows a zero-trust approach:
+
+- **No implicit trust**: Peers joining the network have no automatic access to other peers
+- **Explicit allow rules**: Communication is only permitted through defined policies
+- **Granular control**: Access can be scoped to specific groups, protocols, and ports
+- **Bidirectional rules**: Policies can control traffic flow in one or both directions
+
+<Note>
+When you first create a NetBird account, a default policy is automatically created that allows all peers to communicate. You can disable or delete this policy to enforce stricter access controls.
+</Note>
+
+## Access Control Components
+
+NetBird's access control system is built on three main components:
+
+### 1. Groups
+
+Groups organize peers and users into logical collections. They serve as the building blocks for policies.
+
+- **Peer Groups**: Collections of network devices
+- **User Groups**: Collections of users (for SSH access control)
+- **Dynamic Groups**: Auto-populated based on setup keys or identity provider attributes
+
+Learn more in the [Groups](/network/groups) documentation.
+
+### 2. Policies
+
+Policies define the access rules between groups. Each policy contains one or more rules that specify:
+
+- Source groups (who initiates the connection)
+- Destination groups (who receives the connection)
+- Allowed protocols and ports
+- Traffic direction (unidirectional or bidirectional)
+
+Learn more in the [Policies](/network/policies) documentation.
+
+### 3. Posture Checks
+
+Posture checks ensure devices meet security requirements before granting access:
+
+- Operating system version checks
+- Geolocation requirements
+- Custom validation scripts
+
+Posture checks are attached to policies as source requirements.
+
+## Network Connectivity Flow
+
+Here's how NetBird determines if two peers can communicate:
+
+<Steps>
+
+### Check Policy Status
+
+The system first checks if there are any enabled policies that reference the source and destination peers.
+
+### Evaluate Group Membership
+
+Both peers must be members of groups referenced in at least one policy rule.
+
+### Validate Posture Checks
+
+If the policy has source posture checks defined, the source peer must pass all required checks.
+
+### Apply Protocol and Port Filters
+
+The connection must match the protocol (TCP, UDP, ICMP, or ALL) and port specifications in the policy rule.
+
+### Check Traffic Direction
+
+The policy rule must permit traffic in the requested direction (direct or bidirectional).
+
+</Steps>
+
+## Access Control Best Practices
+
+<Accordion title="Start with Zero Trust">
+Disable or delete the default "Allow All" policy and build access rules based on the principle of least privilege. Only grant the minimum access necessary for peers to perform their functions.
+</Accordion>
+
+<Accordion title="Use Descriptive Group Names">
+Name groups based on their function, location, or department (e.g., `production-servers`, `dev-team`, `office-london`). This makes policies easier to understand and maintain.
+</Accordion>
+
+<Accordion title="Leverage Posture Checks">
+Attach posture checks to policies for sensitive resources. For example, require the latest OS version for peers accessing production databases.
+</Accordion>
+
+<Accordion title="Document Policy Intent">
+Use the policy description field to explain why the policy exists and what business need it serves. This helps during security audits and policy reviews.
+</Accordion>
+
+<Accordion title="Regular Access Reviews">
+Periodically review group memberships and policies to ensure they still reflect current access requirements. Remove unnecessary access promptly.
+</Accordion>
+
+## Access Control vs. Traditional Firewalls
+
+| Traditional Firewall | NetBird Access Control |
+|---------------------|------------------------|
+| Network-based (IP addresses) | Identity-based (groups) |
+| Static rules | Dynamic, follows peers |
+| Perimeter security | Zero-trust model |
+| Broad access zones | Granular peer-to-peer |
+| Manual IP management | Automatic peer discovery |
+
+## Common Access Control Patterns
+
+### Hub-and-Spoke Access
+
+Allow remote workers to access specific servers:
+
+```
+Policy: Remote Access to Services
+Source: remote-workers (group)
+Destination: app-servers (group)
+Protocol: TCP/443, TCP/22
+Direction: Unidirectional
+```
+
+### Segmented Environments
+
+Isolate production from development:
+
+```
+Policy 1: Dev Environment Access
+Source: dev-team (group)
+Destination: dev-servers (group)
+Protocol: ALL
+Direction: Bidirectional
+
+Policy 2: Production Access (no dev access)
+Source: ops-team (group)
+Destination: prod-servers (group)
+Protocol: TCP/443, TCP/22
+Direction: Unidirectional
+```
+
+### Department Isolation
+
+Allow peers within a department to communicate freely:
+
+```
+Policy: Engineering Internal
+Source: engineering-dept (group)
+Destination: engineering-dept (group)
+Protocol: ALL
+Direction: Bidirectional
+```
+
+## Activity Logging
+
+NetBird logs all access control changes for audit purposes:
+
+- Policy creation, modification, and deletion
+- Group membership changes
+- Posture check results
+- Access denial events
+
+These logs are available through the NetBird dashboard and API for security monitoring and compliance reporting.
+
+<Warning>
+Changes to policies and groups take effect immediately. Before modifying production access rules, verify group memberships and test changes in a non-production environment when possible.
+</Warning>
+
+## Related Resources
+
+- [Groups](/network/groups) - Organize peers and users
+- [Policies](/network/policies) - Define access rules
+- [Routes](/network/routes) - Access external networks
+- [DNS](/network/dns) - Private DNS resolution

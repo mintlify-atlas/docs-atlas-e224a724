@@ -1,80 +1,186 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Get NetBird running in 5 minutes"
 ---
 
-## Get started in three steps
+Get NetBird up and running quickly with this step-by-step guide.
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <Step title="Install NetBird">
+    Install the NetBird client for your platform:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    <Tabs>
+      <Tab title="Linux">
+        ```bash
+        curl -fsSL https://pkgs.netbird.io/install.sh | sh
+        ```
+      </Tab>
+      <Tab title="macOS">
+        ```bash
+        brew install netbirdio/tap/netbird
+        ```
+      </Tab>
+      <Tab title="Windows">
+        Download the installer from [netbird.io/install](https://netbird.io/install)
+      </Tab>
+      <Tab title="Docker">
+        ```bash
+        docker run --rm --name netbird -d --network host \
+          --cap-add=NET_ADMIN --cap-add=SYS_ADMIN \
+          -v netbird-client:/etc/netbird \
+          netbirdio/netbird:latest up
+        ```
+      </Tab>
+    </Tabs>
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    <Note>
+      See the [installation guide](/installation) for more platform-specific options and details.
+    </Note>
+  </Step>
+  
+  <Step title="Connect to NetBird">
+    Start NetBird and authenticate:
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash
+    netbird up
+    ```
+    
+    On first run, NetBird will open your browser to authenticate. You can:
+    - **Sign up** for a free NetBird Cloud account
+    - **Connect** to your self-hosted instance by specifying `--management-url`
+    
+    ```bash
+    # For self-hosted
+    netbird up --management-url https://your-management-server.com:443
+    ```
+  </Step>
+  
+  <Step title="Verify your connection">
+    Check your connection status:
+    
+    ```bash
+    netbird status
+    ```
+    
+    You should see output like:
+    
+    ```
+    OS: linux/amd64
+    Daemon status: Connected
+    Management: Connected to https://api.netbird.io:443
+    Signal: Connected to https://signal.netbird.io:443
+    Relays: 2/2 Available
+    NetBird IP: 100.119.62.5/16
+    Interface: wt0
+    Peers count: 3/3 Connected
+    ```
+    
+    To see your connected peers:
+    
+    ```bash
+    netbird status --detail
+    ```
+  </Step>
+  
+  <Step title="Test connectivity">
+    Ping another peer in your network:
+    
+    ```bash
+    # Find peer IPs
+    netbird status --detail
+    
+    # Ping a peer
+    ping 100.119.62.10
+    ```
+    
+    <Info>
+      NetBird assigns each peer a unique IP address from the `100.64.0.0/10` range (CGNAT space). This IP is stable and travels with the device across networks.
+    </Info>
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
+## What's next?
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Architecture" icon="sitemap" href="/architecture/overview">
+    Learn how NetBird creates secure peer-to-peer connections
+  </Card>
+  <Card title="Deploy self-hosted" icon="server" href="/deployment/self-hosted">
+    Run NetBird on your own infrastructure
+  </Card>
+  <Card title="Access control" icon="shield-halved" href="/network/access-control">
+    Configure granular network access policies
+  </Card>
+  <Card title="CLI reference" icon="terminal" href="/cli/overview">
+    Explore all NetBird CLI commands
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Running as a service
+
+To run NetBird as a background service that starts automatically:
+
+<Tabs>
+  <Tab title="Linux">
+    ```bash
+    # Install service
+    sudo netbird service install
+    
+    # Start service
+    sudo netbird service start
+    
+    # Enable auto-start
+    sudo systemctl enable netbird
+    ```
+  </Tab>
+  <Tab title="macOS">
+    ```bash
+    sudo netbird service install
+    sudo netbird service start
+    ```
+  </Tab>
+  <Tab title="Windows">
+    ```powershell
+    # Run as Administrator
+    netbird service install
+    netbird service start
+    ```
+  </Tab>
+</Tabs>
+
+See the [service command reference](/cli/service) for more details.
+
+## Troubleshooting
+
+<Accordion title="Connection fails with 'failed to connect to management server'">
+  Check that you can reach the management server:
+  
+  ```bash
+  curl https://api.netbird.io/api/version
+  # or your self-hosted URL
+  curl https://your-management-server.com:443/api/version
+  ```
+  
+  Verify your firewall allows outbound HTTPS connections on port 443.
+</Accordion>
+
+<Accordion title="Peers can't reach each other">
+  This usually means a direct peer-to-peer connection couldn't be established. Check:
+  
+  1. NAT type compatibility - run `netbird status --detail` and check "Connection type"
+  2. Relay server availability - should show "2/2 Available" 
+  3. Network policies - ensure your peers are allowed to communicate
+  
+  See [troubleshooting](/operations/troubleshooting) for more details.
+</Accordion>
+
+<Accordion title="High CPU or battery usage on mobile">
+  On mobile devices with strict NAT or frequent network changes:
+  
+  - NetBird may fall back to relay servers more often
+  - Frequent reconnections can impact battery life
+  
+  This is normal for mobile carrier networks. The connection will stabilize once on WiFi.
+</Accordion>
+
+For more help, see the [troubleshooting guide](/operations/troubleshooting) or visit the [NetBird community forum](https://forum.netbird.io).

@@ -1,0 +1,446 @@
+---
+title: Logging
+description: Configure and access NetBird logs for troubleshooting and auditing
+---
+
+NetBird uses structured logging with configurable levels and outputs across all components.
+
+## Log Levels
+
+NetBird supports the following log levels (from most to least verbose):
+
+| Level | Description | Use Case |
+|-------|-------------|----------|
+| `trace` | Most detailed, includes fine-grained information | Deep debugging, protocol analysis |
+| `debug` | Detailed debugging information | Development, troubleshooting |
+| `info` | Informational messages about normal operations | Default production level |
+| `warn` | Warning conditions that should be investigated | Potential issues |
+| `error` | Error conditions that don't stop execution | Application errors |
+| `fatal` | Fatal errors that cause program exit | Critical failures |
+| `panic` | Panic level, highest severity | System failures |
+
+<Info>
+The default log level is `info` for production use.
+</Info>
+
+## Client Logging
+
+### Log File Locations
+
+Client logs are written to different locations based on the platform:
+
+<Accordion title="Linux">
+```bash
+/var/log/netbird/client.log
+```
+
+Rotated logs:
+```bash
+/var/log/netbird/client.log.1
+/var/log/netbird/client.log.2
+```
+</Accordion>
+
+<Accordion title="Windows">
+```powershell
+C:\ProgramData\Netbird\client.log
+```
+
+Alternatively, view logs in Event Viewer under Application logs.
+</Accordion>
+
+<Accordion title="macOS">
+```bash
+/var/log/netbird/client.log
+```
+
+Or view via Console.app:
+```bash
+open -a Console
+```
+</Accordion>
+
+<Accordion title="FreeBSD">
+```bash
+/var/db/netbird/client.log
+```
+</Accordion>
+
+### Configure Client Log Level
+
+#### Set Log Level via Command Line
+
+```bash
+# Permanent configuration (add to service)
+netbird up --log-level debug
+
+# Temporary for current session only
+netbird debug log level debug
+```
+
+#### Available Log Levels
+
+```bash
+netbird debug log level trace   # Most verbose
+netbird debug log level debug
+netbird debug log level info    # Default
+netbird debug log level warn
+netbird debug log level error
+netbird debug log level fatal
+netbird debug log level panic   # Least verbose
+```
+
+<Warning>
+`trace` level generates extensive logs and should only be used temporarily for troubleshooting.
+</Warning>
+
+#### Set Log Level via Environment Variable
+
+```bash
+# Linux/macOS
+export NB_LOG_LEVEL=debug
+netbird up
+
+# Windows (PowerShell)
+$env:NB_LOG_LEVEL="debug"
+netbird up
+```
+
+### Log Output Destinations
+
+NetBird supports multiple log outputs simultaneously:
+
+<Accordion title="File Logging (Default)">
+```bash
+netbird up --log-file /var/log/netbird/client.log
+```
+</Accordion>
+
+<Accordion title="Console/Stdout">
+```bash
+netbird up --log-file console
+```
+
+Useful for Docker containers and systemd with journal:
+```bash
+# View with journalctl
+journalctl -u netbird -f
+```
+</Accordion>
+
+<Accordion title="Syslog">
+```bash
+netbird up --log-file syslog
+```
+
+Logs are sent to the system syslog daemon.
+</Accordion>
+
+<Accordion title="Multiple Outputs">
+```bash
+# Write to both file and console
+netbird up --log-file /var/log/netbird/client.log --log-file console
+
+# Via environment variable
+export NB_LOG_FILE="/var/log/netbird/client.log,console"
+```
+</Accordion>
+
+### Temporary Debug Logging
+
+Run with trace logging for a specific duration, then automatically create a debug bundle:
+
+```bash
+# Run with trace logging for 5 minutes
+netbird debug for 5m
+
+# Run with trace logging for 30 seconds
+netbird debug for 30s
+```
+
+This command:
+1. Sets log level to `trace`
+2. Enables sync response persistence
+3. Runs for the specified duration
+4. Creates a debug bundle with logs
+5. Restores original log level
+
+## Server Logging
+
+### Management Server
+
+#### Configure Log Level
+
+```bash
+netbird-mgmt --log-level debug --log-file console
+```
+
+#### Docker Compose Configuration
+
+```yaml
+services:
+  management:
+    image: netbirdio/management:latest
+    command:
+      - "--log-level"
+      - "info"
+      - "--log-file"
+      - "console"
+```
+
+#### View Management Server Logs
+
+```bash
+# Docker
+docker logs netbird-management -f
+
+# Docker Compose
+docker compose logs management -f
+
+# With timestamps
+docker compose logs --timestamps management
+```
+
+### Signal Server
+
+```bash
+# Set log level
+signal --log-level debug --log-file console
+
+# View logs
+docker compose logs signal -f
+```
+
+### Relay Server
+
+```bash
+# Configure via environment variable
+export NB_LOG_LEVEL=debug
+relay
+
+# Docker Compose
+services:
+  relay:
+    image: netbirdio/relay:latest
+    environment:
+      - NB_LOG_LEVEL=debug
+```
+
+## Log Rotation
+
+### Docker Compose Log Rotation
+
+Configure in your `docker-compose.yml`:
+
+```yaml
+x-default: &default
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "500m"
+      max-file: "2"
+
+services:
+  management:
+    <<: *default
+    image: netbirdio/management:latest
+```
+
+### Linux System Log Rotation
+
+Create `/etc/logrotate.d/netbird`:
+
+```bash
+/var/log/netbird/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+    sharedscripts
+    postrotate
+        systemctl reload netbird 2>/dev/null || true
+    endscript
+}
+```
+
+## Structured Logging
+
+NetBird uses structured logging with contextual fields:
+
+### Log Format
+
+```json
+{
+  "time": "2026-03-04T10:30:45Z",
+  "level": "info",
+  "msg": "peer connected",
+  "peer_id": "abc123",
+  "account_id": "xyz789",
+  "request_id": "req-456"
+}
+```
+
+### HTTP Request Tracing
+
+All HTTP requests include a unique request ID:
+
+```
+INFO[2026-03-04T10:30:45Z] HTTP request req-abc123: GET /api/peers
+INFO[2026-03-04T10:30:45Z] HTTP response req-abc123: status 200
+```
+
+## Common Log Patterns
+
+<Accordion title="Successful Peer Connection">
+```
+INFO peer connected: peer=peer-a.netbird.cloud
+INFO connection established: type=P2P local=10.0.0.1:51820 remote=192.168.1.100:51820
+```
+</Accordion>
+
+<Accordion title="NAT Traversal Failure">
+```
+WARN direct connection failed, falling back to relay
+INFO connection established: type=Relayed relay=relay.netbird.io:443
+```
+</Accordion>
+
+<Accordion title="Authentication Issues">
+```
+ERROR failed to authenticate with management server: token expired
+INFO attempting to refresh token
+```
+</Accordion>
+
+<Accordion title="High Login Latency">
+```
+DEBUG request GET /api/users took 8500 ms and finished with status 200
+WARN login request exceeded 7s threshold: account_id=abc123 duration=8500ms
+```
+</Accordion>
+
+## Anonymized Logging
+
+Enable anonymization to hide sensitive information:
+
+```bash
+# Anonymize IPs and domains
+netbird status --anonymize
+netbird debug bundle --anonymize
+
+# Apply to all commands
+export NB_ANONYMIZE=true
+```
+
+Anonymized output:
+```
+Peer: peer-a (wg-*****.netbird.cloud)
+NetBird IP: 100.**.*.***
+```
+
+<Warning>
+Anonymization applies to status output and debug bundles, not to server-side logs.
+</Warning>
+
+## Log Analysis
+
+### Search Logs
+
+```bash
+# Find all errors
+grep "level=error" /var/log/netbird/client.log
+
+# Find specific peer
+grep "peer-a.netbird.cloud" /var/log/netbird/client.log
+
+# Connection events
+grep "connection established" /var/log/netbird/client.log
+```
+
+### Docker Logs
+
+```bash
+# Filter by level
+docker compose logs management | grep "level=error"
+
+# Last 100 lines
+docker compose logs --tail=100 management
+
+# Since timestamp
+docker compose logs --since="2026-03-04T10:00:00" management
+```
+
+## Centralized Logging
+
+### Sending to External Systems
+
+<Accordion title="Loki (Grafana)">
+```yaml
+services:
+  management:
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-retries: "5"
+        loki-batch-size: "400"
+```
+</Accordion>
+
+<Accordion title="Fluentd">
+```yaml
+services:
+  management:
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "netbird.management"
+```
+</Accordion>
+
+<Accordion title="Syslog">
+```yaml
+services:
+  management:
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://192.168.1.100:514"
+        tag: "netbird-management"
+```
+</Accordion>
+
+## Troubleshooting Logging Issues
+
+<Steps>
+  <Step title="Check log file permissions">
+    ```bash
+    ls -la /var/log/netbird/
+    # Should be writable by netbird process
+    ```
+  </Step>
+  
+  <Step title="Verify log directory exists">
+    ```bash
+    mkdir -p /var/log/netbird
+    chown netbird:netbird /var/log/netbird
+    ```
+  </Step>
+  
+  <Step title="Check disk space">
+    ```bash
+    df -h /var/log
+    ```
+  </Step>
+  
+  <Step title="Test with console output">
+    ```bash
+    netbird up --log-file console
+    ```
+  </Step>
+</Steps>

@@ -1,0 +1,415 @@
+---
+title: macOS Client
+description: Install and configure NetBird on macOS
+---
+
+The NetBird client for macOS provides a native menu bar application with full mesh networking capabilities.
+
+## Installation
+
+<Tabs>
+  <Tab title="Install Script (Recommended)">
+    The easiest way to install NetBird on macOS:
+
+    ```bash
+    curl -fsSL https://pkgs.netbird.io/install.sh | sh
+    ```
+
+    This script:
+    - Downloads the official NetBird `.pkg` installer
+    - Installs both the CLI and menu bar app
+    - Sets up the NetBird daemon service
+    - Works on both Intel (amd64) and Apple Silicon (arm64) Macs
+  </Tab>
+
+  <Tab title="Homebrew">
+    Install via Homebrew:
+
+    ```bash
+    brew install netbirdio/tap/netbird
+    brew install --cask netbirdio/tap/netbird-ui
+    ```
+
+    <Note>
+      If you previously installed NetBird via Homebrew, the install script will automatically detect and remove it before installing the official package.
+    </Note>
+  </Tab>
+
+  <Tab title="Manual PKG Installer">
+    Download the installer directly:
+
+    **For Apple Silicon (M1/M2/M3):**
+    ```bash
+    curl -fsSL -o netbird.pkg "https://pkgs.netbird.io/macos/arm64"
+    sudo installer -pkg netbird.pkg -target /
+    rm netbird.pkg
+    ```
+
+    **For Intel Macs:**
+    ```bash
+    curl -fsSL -o netbird.pkg "https://pkgs.netbird.io/macos/amd64"
+    sudo installer -pkg netbird.pkg -target /
+    rm netbird.pkg
+    ```
+  </Tab>
+</Tabs>
+
+## Initial Setup
+
+After installation, you can connect to NetBird using either the menu bar app or the command line.
+
+### Using the Menu Bar App
+
+<Steps>
+  <Step title="Launch NetBird UI">
+    - Open **NetBird UI** from your Applications folder
+    - The NetBird icon will appear in your menu bar
+  </Step>
+
+  <Step title="Connect to your network">
+    - Click the NetBird icon in the menu bar
+    - Click **Connect**
+    - Sign in with your SSO provider or use a setup key
+  </Step>
+
+  <Step title="Verify connection">
+    The menu bar icon will show a connected state, and you can view:
+    - Your NetBird IP address
+    - Connected peers
+    - Network statistics
+  </Step>
+</Steps>
+
+### Using the Command Line
+
+<Steps>
+  <Step title="Start the NetBird service">
+    ```bash
+    netbird service install
+    netbird service start
+    ```
+  </Step>
+
+  <Step title="Connect to NetBird">
+    **Using SSO (Interactive Login):**
+    ```bash
+    netbird up
+    ```
+
+    **Using a Setup Key:**
+    ```bash
+    netbird up --setup-key <YOUR_SETUP_KEY>
+    ```
+
+    **For self-hosted installations:**
+    ```bash
+    netbird up --management-url https://your-management-url.com --setup-key <YOUR_SETUP_KEY>
+    ```
+  </Step>
+
+  <Step title="Check status">
+    ```bash
+    netbird status
+    ```
+
+    Expected output:
+    ```
+    Daemon status: Connected
+    Management: Connected
+    Signal: Connected
+    NetBird IP: 100.x.x.x/16
+    ```
+  </Step>
+</Steps>
+
+## Service Management
+
+Manage the NetBird daemon service:
+
+```bash
+# Check service status
+netbird service status
+
+# Start the service
+netbird service start
+
+# Stop the service
+netbird service stop
+
+# Restart the service
+netbird service restart
+
+# Uninstall the service
+netbird service uninstall
+```
+
+## Configuration
+
+### Config File Location
+
+The NetBird configuration is stored at:
+```
+/etc/netbird/config.json
+```
+
+### Log Files
+
+Logs are written to:
+```
+/var/log/netbird/client.log
+```
+
+View logs in real-time:
+```bash
+tail -f /var/log/netbird/client.log
+```
+
+### Environment Variables
+
+Configure NetBird using environment variables with the `NB_` prefix:
+
+| Variable | Description | Example |
+|----------|-------------|--------|
+| `NB_MANAGEMENT_URL` | Management server URL | `https://api.netbird.io` |
+| `NB_LOG_LEVEL` | Logging level | `info`, `debug`, `error` |
+| `NB_LOG_FILE` | Log file path | `/var/log/netbird/client.log` |
+| `NB_INTERFACE_NAME` | WireGuard interface name | `utun100` |
+| `NB_WIREGUARD_PORT` | WireGuard listening port | `51820` |
+| `NB_CONFIG` | Config file path | `/etc/netbird/config.json` |
+
+Set service environment variables:
+```bash
+netbird service install --service-env="NB_LOG_LEVEL=debug,NB_WIREGUARD_PORT=51820"
+```
+
+### Command-Line Options
+
+Key CLI flags for `netbird up`:
+
+```bash
+# Set custom WireGuard interface name (must use utun prefix)
+netbird up --interface-name utun100
+
+# Set custom WireGuard port
+netbird up --wireguard-port 51820
+
+# Set custom MTU
+netbird up --mtu 1280
+
+# Set custom hostname
+netbird up --hostname my-macbook
+
+# Disable auto-connect on service start
+netbird up --disable-auto-connect
+
+# Set custom DNS resolver address
+netbird up --dns-resolver-address 127.0.0.1:5053
+
+# Add extra DNS labels
+netbird up --extra-dns-labels vpc1,prod
+```
+
+<Note>
+  On macOS, the WireGuard interface name **must** start with the `utun` prefix (e.g., `utun100`, `utun199`). The default is determined by macOS automatically.
+</Note>
+
+## macOS-Specific Features
+
+### Network Monitor
+
+NetBird on macOS has network monitoring **enabled by default** to handle network changes (Wi-Fi switching, VPN connections, etc.).
+
+To disable:
+```bash
+netbird up --network-monitor=false
+```
+
+### System Preferences Integration
+
+After installation, you may need to grant permissions:
+
+1. **System Preferences → Privacy & Security**
+2. Allow NetBird to create network connections
+3. Grant **Full Disk Access** if requested (for logging)
+
+### Menu Bar App Location
+
+The NetBird UI is installed to:
+```
+/Applications/NetBird UI.app
+```
+
+## Advanced Configuration
+
+### Running in Foreground Mode
+
+For debugging or testing:
+
+```bash
+netbird up --foreground-mode
+```
+
+### Custom External IP Mapping
+
+For complex network setups:
+
+```bash
+# Map external IP to local IP
+netbird up --external-ip-map 203.0.113.5/192.168.1.10
+
+# Map external IP to interface
+netbird up --external-ip-map 203.0.113.5/en0
+
+# Multiple mappings
+netbird up --external-ip-map 203.0.113.5,203.0.113.6/192.168.1.10
+```
+
+### Disable Auto-Connect
+
+Prevent NetBird from connecting automatically when the service starts:
+
+```bash
+netbird up --disable-auto-connect
+```
+
+You'll need to manually run `netbird up` each time.
+
+## Troubleshooting
+
+### Check Connection Status
+
+```bash
+# Basic status
+netbird status
+
+# Detailed status with peer information
+netbird status --detail
+
+# JSON output for parsing
+netbird status --json
+
+# Get only your NetBird IP
+netbird status --ipv4
+```
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="Menu bar app won't start">
+    Check if the service is running:
+    ```bash
+    netbird service status
+    ```
+
+    Restart the service:
+    ```bash
+    netbird service restart
+    ```
+
+    Reinstall the menu bar app:
+    ```bash
+    curl -fsSL https://pkgs.netbird.io/install.sh | sh
+    ```
+  </Accordion>
+
+  <Accordion title="Interface name errors">
+    On macOS, interface names must use the `utun` prefix:
+    ```bash
+    # ✅ Correct
+    netbird up --interface-name utun100
+    
+    # ❌ Incorrect
+    netbird up --interface-name wg0
+    ```
+  </Accordion>
+
+  <Accordion title="Permission denied errors">
+    Grant necessary permissions in System Preferences:
+    1. Go to **System Preferences → Privacy & Security**
+    2. Allow NetBird in **Full Disk Access** (if needed)
+    3. Allow NetBird to create network connections
+  </Accordion>
+
+  <Accordion title="Connection timeout">
+    Check your firewall settings:
+    ```bash
+    # Check if NetBird is allowed
+    sudo /usr/libexec/ApplicationFirewall/socketfilterfw --listapps
+    ```
+
+    Enable debug logging:
+    ```bash
+    netbird service stop
+    netbird service install --service-env="NB_LOG_LEVEL=debug"
+    netbird service start
+    
+    tail -f /var/log/netbird/client.log
+    ```
+  </Accordion>
+
+  <Accordion title="Already installed warning">
+    If you see "NetBird is already installed," first uninstall:
+    ```bash
+    netbird service stop
+    netbird service uninstall
+    sudo rm -rf /Library/Receipts/netbird.pkg
+    sudo rm -rf "/Applications/NetBird UI.app"
+    
+    # Then reinstall
+    curl -fsSL https://pkgs.netbird.io/install.sh | sh
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Updating NetBird
+
+### Using the Install Script
+
+```bash
+curl -fsSL https://pkgs.netbird.io/install.sh | sh
+```
+
+The script will detect the existing installation and update it.
+
+### Using Homebrew
+
+If installed via Homebrew:
+
+```bash
+brew upgrade netbird netbird-ui
+```
+
+## Uninstalling
+
+<Steps>
+  <Step title="Stop and uninstall the service">
+    ```bash
+    netbird service stop
+    netbird service uninstall
+    ```
+  </Step>
+
+  <Step title="Remove the applications">
+    ```bash
+    # Remove the menu bar app
+    sudo rm -rf "/Applications/NetBird UI.app"
+    
+    # Remove the CLI binary
+    sudo rm -f /usr/local/bin/netbird
+    
+    # Remove configuration and logs
+    sudo rm -rf /etc/netbird /var/log/netbird
+    ```
+  </Step>
+
+  <Step title="Remove package receipt">
+    ```bash
+    sudo rm -rf /Library/Receipts/netbird.pkg
+    ```
+  </Step>
+</Steps>
+
+For Homebrew installations:
+```bash
+brew uninstall netbird netbird-ui
+```

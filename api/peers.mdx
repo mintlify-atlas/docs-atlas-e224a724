@@ -1,0 +1,363 @@
+---
+title: Peers API
+description: Manage network peers and devices
+---
+
+The Peers API allows you to manage devices (peers) in your NetBird network, including updating configurations, approving peers, and managing peer connectivity.
+
+## List All Peers
+
+Returns a list of all peers in your network.
+
+```bash
+GET /api/peers
+```
+
+<ParamField query="name" type="string">
+  Filter peers by name
+</ParamField>
+
+<ParamField query="ip" type="string">
+  Filter peers by IP address
+</ParamField>
+
+<CodeGroup>
+```bash All Peers
+curl -X GET https://api.netbird.io/api/peers \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```bash Filter by Name
+curl -X GET "https://api.netbird.io/api/peers?name=laptop-01" \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```json Response
+[
+  {
+    "id": "chacbco6lnnbn6cg5s90",
+    "name": "laptop-01",
+    "ip": "100.64.0.1",
+    "connection_ip": "203.0.113.42",
+    "connected": true,
+    "last_seen": "2023-05-05T10:05:26.420578Z",
+    "os": "darwin 13.2.1",
+    "kernel_version": "23.2.0",
+    "version": "0.14.0",
+    "groups": [
+      {
+        "id": "ch8i4ug6lnn4g9hqv7m0",
+        "name": "developers",
+        "peers_count": 5
+      }
+    ],
+    "ssh_enabled": true,
+    "user_id": "google-oauth2|277474792786460067937",
+    "hostname": "johns-macbook",
+    "dns_label": "laptop-01.netbird.cloud",
+    "login_expiration_enabled": false,
+    "login_expired": false,
+    "last_login": "2023-05-05T09:00:35.477782Z",
+    "approval_required": false,
+    "accessible_peers_count": 12
+  }
+]
+```
+</CodeGroup>
+
+<ResponseField name="id" type="string">
+  Unique peer identifier
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Peer's hostname or custom name
+</ResponseField>
+
+<ResponseField name="ip" type="string">
+  Peer's assigned NetBird IP address
+</ResponseField>
+
+<ResponseField name="connection_ip" type="string">
+  Peer's public connection IP address
+</ResponseField>
+
+<ResponseField name="connected" type="boolean">
+  Peer to Management connection status
+</ResponseField>
+
+<ResponseField name="last_seen" type="string">
+  Last time peer connected to management service (ISO 8601)
+</ResponseField>
+
+<ResponseField name="os" type="string">
+  Peer's operating system and version
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  NetBird daemon version running on the peer
+</ResponseField>
+
+<ResponseField name="groups" type="array">
+  Groups that the peer belongs to
+</ResponseField>
+
+<ResponseField name="ssh_enabled" type="boolean">
+  Indicates if SSH server is enabled on this peer
+</ResponseField>
+
+<ResponseField name="dns_label" type="string">
+  Peer's FQDN for DNS resolution
+</ResponseField>
+
+<ResponseField name="approval_required" type="boolean">
+  (Cloud only) Indicates if peer needs approval
+</ResponseField>
+
+## Get a Peer
+
+Retrieve detailed information about a specific peer.
+
+```bash
+GET /api/peers/{peerId}
+```
+
+<ParamField path="peerId" type="string" required>
+  The unique identifier of the peer
+</ParamField>
+
+```bash Example
+curl -X GET https://api.netbird.io/api/peers/chacbco6lnnbn6cg5s90 \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+## Update a Peer
+
+Update peer configuration including name, SSH status, and expiration settings.
+
+```bash
+PUT /api/peers/{peerId}
+```
+
+<ParamField path="peerId" type="string" required>
+  The unique identifier of the peer
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Peer's hostname or custom name
+</ParamField>
+
+<ParamField body="ssh_enabled" type="boolean" required>
+  Enable or disable SSH server on this peer
+</ParamField>
+
+<ParamField body="login_expiration_enabled" type="boolean" required>
+  Enable or disable login expiration for this peer
+</ParamField>
+
+<ParamField body="inactivity_expiration_enabled" type="boolean" required>
+  Enable or disable inactivity expiration for this peer
+</ParamField>
+
+<ParamField body="approval_required" type="boolean">
+  (Cloud only) Indicates if peer needs approval
+</ParamField>
+
+<ParamField body="ip" type="string">
+  Custom IP address for the peer (IPv4 format)
+</ParamField>
+
+<CodeGroup>
+```bash Update Peer
+curl -X PUT https://api.netbird.io/api/peers/chacbco6lnnbn6cg5s90 \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "production-server-01",
+    "ssh_enabled": true,
+    "login_expiration_enabled": false,
+    "inactivity_expiration_enabled": false
+  }'
+```
+
+```json Response
+{
+  "id": "chacbco6lnnbn6cg5s90",
+  "name": "production-server-01",
+  "ip": "100.64.0.1",
+  "ssh_enabled": true,
+  "login_expiration_enabled": false,
+  "inactivity_expiration_enabled": false,
+  "connected": true,
+  "last_seen": "2023-05-05T10:05:26.420578Z"
+}
+```
+</CodeGroup>
+
+## Delete a Peer
+
+Remove a peer from the network.
+
+```bash
+DELETE /api/peers/{peerId}
+```
+
+<ParamField path="peerId" type="string" required>
+  The unique identifier of the peer
+</ParamField>
+
+```bash Example
+curl -X DELETE https://api.netbird.io/api/peers/chacbco6lnnbn6cg5s90 \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+<Warning>
+Deleting a peer will:
+- Remove it from all groups
+- Disconnect it from the network
+- Remove it from all policies
+
+This action cannot be undone.
+</Warning>
+
+## List Accessible Peers
+
+Returns a list of peers that a specific peer can connect to based on policies.
+
+```bash
+GET /api/peers/{peerId}/accessible-peers
+```
+
+<ParamField path="peerId" type="string" required>
+  The unique identifier of the peer
+</ParamField>
+
+<CodeGroup>
+```bash Request
+curl -X GET https://api.netbird.io/api/peers/chacbco6lnnbn6cg5s90/accessible-peers \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```json Response
+[
+  {
+    "id": "chacbco6lnnbn6cg5s91",
+    "name": "server-01",
+    "ip": "100.64.0.15",
+    "dns_label": "server-01.netbird.cloud",
+    "user_id": "google-oauth2|123456",
+    "os": "linux",
+    "country_code": "US",
+    "city_name": "New York",
+    "connected": true,
+    "last_seen": "2023-05-05T10:05:26.420578Z"
+  }
+]
+```
+</CodeGroup>
+
+## Create Temporary Access Peer
+
+Create a temporary access peer for short-term access to a specific peer. The temporary peer and its policies are automatically deleted after it disconnects.
+
+```bash
+POST /api/peers/{peerId}/temporary-access
+```
+
+<ParamField path="peerId" type="string" required>
+  The unique identifier of the peer to grant access to
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Temporary peer's hostname
+</ParamField>
+
+<ParamField body="wg_pub_key" type="string" required>
+  WireGuard public key of the temporary peer
+</ParamField>
+
+<ParamField body="rules" type="array" required>
+  List of access rules (e.g., ["tcp/80", "tcp/443"])
+</ParamField>
+
+<CodeGroup>
+```bash Request
+curl -X POST https://api.netbird.io/api/peers/chacbco6lnnbn6cg5s90/temporary-access \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "temp-access-001",
+    "wg_pub_key": "n0r3pL4c3h0ld3rK3y==",
+    "rules": ["tcp/22", "tcp/443"]
+  }'
+```
+
+```json Response
+{
+  "id": "chacbco6lnnbn6cg5s92",
+  "name": "temp-access-001",
+  "rules": ["tcp/22", "tcp/443"]
+}
+```
+</CodeGroup>
+
+<Note>
+Temporary access peers are designed for support sessions, debugging, or temporary contractor access. They automatically clean up when disconnected.
+</Note>
+
+## Peer Status Indicators
+
+<CardGroup cols={2}>
+  <Card title="Connected" icon="circle-check" color="#16a34a">
+    Peer is online and connected to the management server
+  </Card>
+  <Card title="Disconnected" icon="circle-xmark" color="#dc2626">
+    Peer is offline or hasn't connected recently
+  </Card>
+  <Card title="Login Expired" icon="clock" color="#ea580c">
+    User needs to re-authenticate on this peer
+  </Card>
+  <Card title="Pending Approval" icon="hourglass" color="#ca8a04">
+    Peer requires admin approval before joining
+  </Card>
+</CardGroup>
+
+## Peer Features
+
+### SSH Access
+
+Enable SSH access to peers through NetBird:
+
+```json
+{
+  "ssh_enabled": true
+}
+```
+
+When enabled, you can SSH to peers using their NetBird IP or DNS name:
+
+```bash
+ssh user@laptop-01.netbird.cloud
+ssh user@100.64.0.1
+```
+
+### Login Expiration
+
+Force periodic re-authentication:
+
+```json
+{
+  "login_expiration_enabled": true
+}
+```
+
+Expiration period is configured globally in account settings.
+
+### Inactivity Expiration
+
+Automatically disconnect inactive peers:
+
+```json
+{
+  "inactivity_expiration_enabled": true
+}
+```

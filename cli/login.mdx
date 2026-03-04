@@ -1,0 +1,402 @@
+---
+title: netbird login
+description: Authenticate with the NetBird management server
+---
+
+## Overview
+
+The `netbird login` command authenticates your device with the NetBird management server without establishing network connections. Use this to authenticate before connecting with `netbird up`.
+
+```bash
+netbird login [flags]
+```
+
+## Description
+
+This command performs authentication only:
+
+1. Initiates SSO authentication flow (if no setup key provided)
+2. Validates credentials with the management server
+3. Stores authentication tokens locally
+4. Does NOT bring up the WireGuard interface
+5. Does NOT establish peer connections
+
+Use `netbird up` after login to connect to the network, or use `netbird up` directly (which includes login if needed).
+
+## When to Use Login vs Up
+
+### Use `netbird login` when:
+- You want to authenticate without connecting immediately
+- Pre-authenticating in preparation for later connection
+- Testing authentication credentials
+- Separating authentication from connection in automation scripts
+
+### Use `netbird up` when:
+- You want to authenticate AND connect in one step (most common)
+- Starting NetBird for normal use
+
+## Flags
+
+<ParamField path="--profile" type="string">
+  Profile name to use for the login. If not specified, the last used profile will be used.
+</ParamField>
+
+<ParamField path="--no-browser" type="boolean" default="false">
+  Do not open the browser for SSO login
+  
+  When enabled, displays the authentication URL for manual browser access. Useful for:
+  - Headless servers
+  - SSH sessions
+  - Automated environments
+  - Remote systems
+</ParamField>
+
+All [global flags](/cli/overview#global-flags) are also available, including:
+- `--setup-key` - Authenticate with a setup key instead of SSO
+- `--management-url` - Specify management server URL
+- `--hostname` - Set custom hostname
+
+## Examples
+
+### Interactive SSO Login
+
+Login with SSO (opens browser):
+
+```bash
+netbird login
+```
+
+Output:
+```
+Please do the SSO login in your browser.
+If your browser didn't open automatically, use this URL to log in:
+
+https://auth.netbird.io/activate?user_code=ABCD-EFGH
+
+Logging successfully
+```
+
+### Login Without Browser (Headless)
+
+For servers or SSH sessions:
+
+```bash
+netbird login --no-browser
+```
+
+Output:
+```
+Use this URL to log in:
+
+https://auth.netbird.io/activate?user_code=ABCD-EFGH and enter the code ABCD-EFGH to authenticate.
+
+Logging successfully
+```
+
+Open the URL on another device to complete authentication.
+
+### Login with Setup Key
+
+Non-interactive authentication using a setup key:
+
+```bash
+netbird login --setup-key YOUR_SETUP_KEY
+```
+
+Output:
+```
+Logging successfully
+```
+
+### Login to Self-Hosted Management Server
+
+```bash
+netbird login --management-url https://management.example.com
+```
+
+### Login with Custom Hostname
+
+```bash
+netbird login --hostname my-server-01
+```
+
+### Login to Specific Profile
+
+```bash
+netbird login --profile work
+```
+
+### Environment Variable Authentication
+
+Use environment variables for automation:
+
+```bash
+export NB_SETUP_KEY="your-setup-key"
+export NB_MANAGEMENT_URL="https://management.example.com"
+netbird login
+```
+
+## Authentication Methods
+
+### SSO (Single Sign-On)
+
+Default authentication method for interactive sessions:
+
+**Supported SSO Providers:**
+- Google
+- Microsoft Azure AD / Entra ID
+- Okta
+- Auth0
+- Keycloak
+- Other OIDC providers
+
+**Flow:**
+1. Run `netbird login`
+2. Browser opens to SSO provider
+3. Login with your SSO credentials
+4. Browser redirects back with success message
+5. NetBird stores authentication token
+
+**Headless SSO:**
+```bash
+netbird login --no-browser
+```
+Copy the displayed URL to a browser on any device.
+
+### Setup Key
+
+Non-interactive authentication for automation:
+
+```bash
+netbird login --setup-key YOUR_SETUP_KEY
+```
+
+**Setup key features:**
+- Created in Management Dashboard
+- Can be reusable or one-time use
+- Can have expiration dates
+- Can auto-assign to groups
+- Ideal for scripting and automation
+
+**Generate setup keys:**
+1. Log into NetBird Management Dashboard
+2. Navigate to Setup Keys
+3. Click "Add Key"
+4. Configure key properties
+5. Copy the generated key
+
+See: [Register Machines Using Setup Keys](/api/setup-keys)
+
+## Login Flow
+
+### Daemon Mode (Default)
+
+When the NetBird daemon is running:
+
+```bash
+netbird service start
+netbird login
+```
+
+Authentication is handled by the daemon service.
+
+### Foreground Mode
+
+Without daemon (standalone authentication):
+
+```bash
+netbird login
+```
+
+If log files are not configured, runs in standalone mode.
+
+## Profile Management
+
+NetBird supports multiple profiles for different networks or accounts:
+
+### Login to Specific Profile
+
+```bash
+netbird login --profile work
+```
+
+### Switch Profile During Login
+
+If currently connected, will disconnect first:
+
+```bash
+netbird login --profile personal
+```
+
+### Create Profile and Login
+
+Profiles are created automatically on first login:
+
+```bash
+netbird login --profile new-profile --setup-key YOUR_KEY
+```
+
+For profile management, use the `--profile` flag
+
+## Status Messages
+
+- `Logging successfully` - Authentication completed successfully
+- `login failed` - Authentication failed (check credentials or setup key)
+- `failed to connect to daemon` - NetBird daemon not running
+- `NeedsSSOLogin` - SSO authentication required
+
+## Common Issues
+
+### Daemon Not Running
+
+```
+failed to connect to daemon error: connection refused
+If the daemon is not running please run:
+netbird service install
+netbird service start
+```
+
+**Solution:**
+```bash
+netbird service install
+netbird service start
+netbird login
+```
+
+### Browser Not Opening
+
+If browser doesn't open automatically:
+
+1. Copy the displayed URL
+2. Open it manually in a browser
+3. Complete authentication
+
+Or use `--no-browser` explicitly:
+```bash
+netbird login --no-browser
+```
+
+### Invalid Setup Key
+
+```
+login failed: invalid setup key
+```
+
+**Causes:**
+- Key has expired
+- Key was deleted
+- Key is one-time use and already consumed
+- Typo in key value
+
+**Solution:** Generate a new setup key in the Management Dashboard
+
+### Authentication Timeout
+
+If SSO authentication times out:
+
+1. Run `netbird login` again
+2. Complete authentication more quickly
+3. Check network connectivity
+
+### Session Already Exists
+
+If already logged in:
+
+```bash
+netbird logout
+netbird login
+```
+
+## Security Considerations
+
+### Token Storage
+
+Authentication tokens are stored securely in:
+- Linux: `/etc/netbird/config.json`
+- macOS: `/etc/netbird/config.json`
+- Windows: `%PROGRAMDATA%\Netbird\config.json`
+
+**Permissions:**
+- File should be readable only by root/administrator
+- Contains sensitive authentication data
+- Do not share or commit to version control
+
+### Setup Key Security
+
+**Best practices:**
+- Use one-time keys for automated provisioning
+- Set expiration dates on keys
+- Delete unused keys
+- Use different keys for different environments
+- Never commit keys to source control
+- Use environment variables or secret managers
+
+**Environment variable example:**
+```bash
+# In CI/CD pipeline
+export NB_SETUP_KEY="$NETBIRD_SETUP_KEY"
+netbird login
+```
+
+## Automation Examples
+
+### Docker/Container Init
+
+```dockerfile
+FROM ubuntu:22.04
+
+# Install NetBird
+RUN curl -sSL https://pkgs.netbird.io/install.sh | bash
+
+# Login script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+```
+
+```bash
+#!/bin/bash
+# entrypoint.sh
+netbird login --setup-key "$NETBIRD_SETUP_KEY" --hostname "$HOSTNAME"
+netbird up
+exec "$@"
+```
+
+### CI/CD Pipeline
+
+```yaml
+# GitHub Actions example
+- name: Connect to NetBird
+  env:
+    NB_SETUP_KEY: ${{ secrets.NETBIRD_SETUP_KEY }}
+    NB_HOSTNAME: "ci-runner-${{ github.run_id }}"
+  run: |
+    curl -sSL https://pkgs.netbird.io/install.sh | bash
+    netbird login
+    netbird up
+```
+
+### Terraform/Ansible
+
+```hcl
+# Terraform cloud-init
+resource "aws_instance" "app" {
+  user_data = <<-EOF
+    #!/bin/bash
+    curl -sSL https://pkgs.netbird.io/install.sh | bash
+    export NB_SETUP_KEY="${var.netbird_setup_key}"
+    netbird service install
+    netbird service start
+    netbird login
+    netbird up
+  EOF
+}
+```
+
+## See Also
+
+- [netbird up](/cli/up) - Authenticate and connect
+- [netbird logout](/cli/login) - Clear authentication
+- [netbird status](/cli/status) - Check authentication status
+- [Setup Keys Guide](/api/setup-keys)

@@ -1,0 +1,583 @@
+---
+title: Routes
+description: Configure network routing to access external networks through NetBird
+---
+
+# Routes
+
+NetBird routes enable peers to access networks and resources that aren't directly part of your NetBird mesh network. By designating specific peers as routing peers (or exit nodes), you can route traffic to external networks, cloud VPCs, on-premise networks, or even the entire internet.
+
+## How Routes Work
+
+Routes define network prefixes or domains that should be accessible through designated routing peers:
+
+```
+┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
+│  NetBird Peer   │────────▶│  Routing Peer    │────────▶│ External Network│
+│  (Client)       │         │  (Gateway)       │         │  10.0.0.0/24    │
+└─────────────────┘         └──────────────────┘         └─────────────────┘
+```
+
+The routing peer acts as a gateway, forwarding traffic from NetBird peers to the external network and routing responses back.
+
+## Route Structure
+
+A NetBird route contains:
+
+```go
+type Route struct {
+    ID                  ID           // Unique route identifier
+    NetID               NetID        // Human-readable identifier
+    Description         string       // Route purpose
+    Network             netip.Prefix // Network CIDR (for static routes)
+    Domains             domain.List  // Domain list (for dynamic routes)
+    NetworkType         NetworkType  // IPv4, IPv6, or Domain
+    Peer                string       // Single routing peer ID
+    PeerGroups          []string     // Routing peer group IDs
+    Enabled             bool         // Route active status
+    Masquerade          bool         // Enable NAT/masquerading
+    Metric              int          // Route priority (1-9999)
+    KeepRoute           bool         // Keep route when peer is offline
+    Groups              []string     // Distribution groups
+    AccessControlGroups []string     // Additional access control
+    SkipAutoApply       bool         // Skip auto-apply for exit nodes
+}
+```
+
+## Network Types
+
+NetBird supports three types of routes:
+
+### IPv4 Routes
+
+Static routes to IPv4 networks:
+
+```
+Network: 10.0.0.0/24
+NetworkType: IPv4Network
+```
+
+Example use cases:
+- Access to on-premise office network
+- Cloud VPC routing
+- Private subnet access
+
+### IPv6 Routes
+
+Static routes to IPv6 networks:
+
+```
+Network: 2001:db8::/32
+NetworkType: IPv6Network
+```
+
+### Dynamic Domain Routes
+
+Routes based on domain names (DNS-based routing):
+
+```
+Domains: ["example.com", "api.service.local"]
+NetworkType: DomainNetwork
+```
+
+NetBird resolves these domains dynamically and routes traffic accordingly.
+
+<Note>
+Routes can specify either a network prefix OR domains, but not both. For domain routes, the network field is set to a placeholder IP (192.0.2.0/32) internally.
+</Note>
+
+## Route Configuration
+
+### Basic Route Parameters
+
+<Accordion title="Network Identifier (NetID)">
+A human-readable identifier for the route (1-40 characters):
+
+```go
+const MaxNetIDChar = 40  // Maximum length
+```
+
+Examples:
+- `"office-network"`
+- `"aws-vpc-production"`
+- `"internet-exit-node"`
+
+The NetID is used for identifying and grouping related routes.
+</Accordion>
+
+<Accordion title="Network or Domains">
+Define what network or domains this route covers:
+
+**For static networks:**
+```
+Network: 10.0.0.0/24
+Domains: []
+```
+
+**For dynamic domains:**
+```
+Network: (placeholder)
+Domains: ["internal.example.com", "*.service.local"]
+```
+
+The network must be a valid CIDR notation (e.g., `192.168.1.0/24`, `10.0.0.0/8`).
+</Accordion>
+
+<Accordion title="Routing Peer or Peer Groups">
+Specify which peer(s) will act as gateways:
+
+**Single peer:**
+```
+Peer: "peer-abc123"
+PeerGroups: []
+```
+
+**Multiple peers via groups (high availability):**
+```
+Peer: ""
+PeerGroups: ["office-routers", "backup-gateways"]
+```
+
+<Note>
+You can specify either a single peer OR peer groups, but not both. Using peer groups enables automatic failover if one routing peer goes offline.
+</Note>
+</Accordion>
+
+<Accordion title="Masquerade (NAT)">
+Enable Network Address Translation on the routing peer:
+
+```
+Masquerade: true
+```
+
+When enabled:
+- The routing peer performs source NAT
+- External networks see traffic coming from the routing peer's IP
+- Required when the external network doesn't have routes back to NetBird peers
+
+When disabled:
+- Traffic keeps the original source IP
+- External network must have routes back to NetBird IPs
+- Better for logging and access control on the external network
+</Accordion>
+
+<Accordion title="Metric (Priority)">
+Route priority when multiple routes exist for the same destination:
+
+```go
+const (
+    MinMetric = 1
+    MaxMetric = 9999
+)
+```
+
+Lower values = higher priority
+
+Example:
+```
+Route 1: 10.0.0.0/8, Metric: 100 (preferred)
+Route 2: 10.0.0.0/16, Metric: 200 (backup)
+```
+</Accordion>
+
+<Accordion title="Distribution Groups">
+Control which peers receive this route:
+
+```
+Groups: ["remote-workers", "mobile-devices"]
+```
+
+Only peers in these groups will have the route installed on their devices. This allows you to:
+- Limit route distribution to specific teams
+- Create different routing policies for different user groups
+- Reduce routing table size on peers that don't need the route
+</Accordion>
+
+<Accordion title="Access Control Groups">
+Additional access control on top of distribution:
+
+```
+Groups: ["all-users"]              // These peers get the route
+AccessControlGroups: ["approved-users"]  // But only these can use it
+```
+
+Access control groups further restrict which peers can actually use the route, even if they receive it.
+</Accordion>
+
+## Creating Routes
+
+<Steps>
+
+### Define the Network
+
+Determine what network or domains you want to route:
+
+```
+Network: 10.0.0.0/24
+Description: "Office LAN access"
+```
+
+### Choose Routing Peer(s)
+
+Select a peer that has access to the target network:
+
+```
+Peer: "office-gateway-01"
+```
+
+Or use a group for high availability:
+
+```
+PeerGroups: ["office-gateways"]
+```
+
+### Configure Route Settings
+
+```
+Metric: 100
+Masquerade: true
+Enabled: true
+KeepRoute: false
+```
+
+### Set Distribution
+
+Choose which peers should receive this route:
+
+```
+Groups: ["remote-workers"]
+```
+
+### Save and Enable
+
+The route is distributed to eligible peers immediately.
+
+</Steps>
+
+## Route Examples
+
+### Office Network Access
+
+```yaml
+NetID: "office-network"
+Description: "Access to office LAN"
+Network: 192.168.1.0/24
+NetworkType: IPv4Network
+Peer: "office-router"
+Masquerade: true
+Metric: 100
+Enabled: true
+Groups: ["remote-workers"]
+```
+
+### Cloud VPC Routing
+
+```yaml
+NetID: "aws-vpc-prod"
+Description: "Production VPC in AWS us-east-1"
+Network: 10.100.0.0/16
+NetworkType: IPv4Network
+PeerGroups: ["aws-gateways"]
+Masquerade: false  # VPC has routes back to NetBird
+Metric: 50
+Enabled: true
+Groups: ["engineering", "ops"]
+```
+
+### Internet Exit Node
+
+```yaml
+NetID: "internet-exit"
+Description: "Route all internet traffic through NetBird"
+Network: 0.0.0.0/0
+NetworkType: IPv4Network
+PeerGroups: ["exit-nodes"]
+Masquerade: true
+Metric: 1000  # Lower priority than specific routes
+Enabled: true
+Groups: ["mobile-users"]
+SkipAutoApply: false  # Auto-apply for clients
+```
+
+### Domain-Based Routing
+
+```yaml
+NetID: "internal-services"
+Description: "Route internal domain traffic"
+Domains: ["internal.company.com", "api.service.local"]
+NetworkType: DomainNetwork
+Peer: "internal-gateway"
+Masquerade: true
+Metric: 100
+Enabled: true
+Groups: ["all-users"]
+```
+
+### High Availability Setup
+
+```yaml
+NetID: "datacenter-ha"
+Description: "Redundant access to datacenter"
+Network: 172.16.0.0/12
+NetworkType: IPv4Network
+PeerGroups: ["datacenter-routers"]  # Multiple peers for failover
+Masquerade: true
+Metric: 100
+Enabled: true
+Groups: ["engineering", "ops"]
+```
+
+## Route Validation
+
+NetBird validates routes to prevent conflicts:
+
+```go
+// From route.go:validateRoute
+func validateRoute(ctx context.Context, transaction store.Store, 
+    accountID string, routeToSave *Route) error
+```
+
+Validation checks:
+
+1. **Metric range**: Must be between 1 and 9999
+2. **NetID length**: Must be 1-40 characters
+3. **Network or domains**: Must specify one, but not both
+4. **Valid CIDR**: Network must be a valid prefix
+5. **Peer XOR groups**: Cannot specify both peer and peer groups
+6. **Group existence**: All referenced groups must exist
+7. **No duplicates**: Same prefix cannot be assigned to overlapping peers
+
+### Preventing Duplicate Routes
+
+NetBird prevents creating multiple routes with the same network/domains on the same peer:
+
+```go
+// From route.go:checkRoutePrefixOrDomainsExistForPeers
+func checkRoutePrefixOrDomainsExistForPeers(ctx context.Context, 
+    transaction store.Store, accountID string, 
+    checkRoute *Route, groupsMap map[string]*Group) error
+```
+
+This ensures:
+- No peer has duplicate routes for the same network
+- No peer group members have conflicting routes
+- High availability setups are properly configured
+
+## Route Status and Keep Route
+
+The `KeepRoute` setting controls route behavior when the routing peer goes offline:
+
+```
+KeepRoute: false (default)
+→ Route is removed when routing peer disconnects
+→ Traffic stops flowing to that network
+
+KeepRoute: true
+→ Route remains even when routing peer is offline
+→ Prevents routing table churn
+→ Useful for temporarily offline peers
+```
+
+<Warning>
+When `KeepRoute` is true, client devices will continue trying to route traffic through the offline peer, causing connectivity failures until the peer comes back online or the route is disabled.
+</Warning>
+
+## High Availability Routing
+
+Using peer groups for routing enables automatic failover:
+
+```yaml
+PeerGroups: ["datacenter-gateways"]
+
+Group Members:
+├── gateway-01 (primary)
+├── gateway-02 (backup)
+└── gateway-03 (backup)
+```
+
+Behavior:
+- All peers in the group advertise the route
+- Client peers choose based on connectivity and metric
+- If primary fails, traffic automatically fails over to backup
+- When primary recovers, it becomes available again
+
+This provides redundancy without manual intervention.
+
+## Exit Nodes (Internet Routing)
+
+An exit node routes all internet traffic through a NetBird peer:
+
+```yaml
+Network: 0.0.0.0/0  # All IPv4 traffic
+Network: ::/0       # All IPv6 traffic
+```
+
+Common use cases:
+- Bypass geographic restrictions
+- Route mobile devices through a secure gateway
+- Access region-specific services
+- Centralize internet filtering
+
+### Exit Node Configuration
+
+```yaml
+NetID: "exit-node-us-east"
+Network: 0.0.0.0/0
+Peer: "cloud-gateway-use1"
+Masquerade: true  # Required for internet routing
+Metric: 1000      # Lower priority than specific routes
+SkipAutoApply: false  # Allow clients to auto-enable
+Groups: ["mobile-users", "remote-workers"]
+```
+
+The `SkipAutoApply` setting controls whether client applications automatically use the exit node or require manual activation.
+
+## Route Metrics and Priority
+
+When multiple routes match a destination, NetBird uses the metric to determine priority:
+
+```
+Destination: 10.0.1.50
+
+Route 1: 10.0.1.0/24, Metric: 100  ← Most specific, chosen
+Route 2: 10.0.0.0/16, Metric: 200
+Route 3: 10.0.0.0/8,  Metric: 300
+```
+
+Priority is determined by:
+1. **Most specific prefix** (longest prefix match)
+2. **Lowest metric** (if prefix lengths are equal)
+
+<Note>
+NetBird uses standard routing table logic. More specific routes (longer prefix) always take precedence over less specific routes, regardless of metric.
+</Note>
+
+## Route Activity Events
+
+All route operations are logged:
+
+- `RouteCreated`: New route created
+- `RouteUpdated`: Route modified  
+- `RouteRemoved`: Route deleted
+
+Event metadata:
+```go
+meta := map[string]any{
+    "name": route.NetID,
+    "network_range": route.Network.String(),
+    "domains": route.Domains.SafeString(),
+    "peer_id": route.Peer,
+    "peer_groups": route.PeerGroups,
+}
+```
+
+## Routing Peer Requirements
+
+For a peer to act as a routing peer, it must:
+
+1. **Have IP forwarding enabled** on the operating system
+2. **Have network access** to the destination network
+3. **Be connected** to the NetBird network
+4. **Have proper firewall rules** allowing forwarding
+
+On Linux:
+```bash
+# Enable IP forwarding
+sudo sysctl -w net.ipv4.ip_forward=1
+sudo sysctl -w net.ipv6.conf.all.forwarding=1
+
+# Make persistent
+echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
+echo "net.ipv6.conf.all.forwarding=1" | sudo tee -a /etc/sysctl.conf
+```
+
+## Route Best Practices
+
+<Accordion title="Use Descriptive NetIDs">
+Choose meaningful identifiers that explain the route's purpose:
+
+✅ Good:
+- `"aws-vpc-production"`
+- `"office-network-london"`
+- `"datacenter-dmz"`
+
+❌ Bad:
+- `"route1"`
+- `"network"`
+- `"test"`
+</Accordion>
+
+<Accordion title="Enable Masquerade When Needed">
+Use masquerade when:
+- The external network doesn't have return routes to NetBird IPs
+- Routing to the internet (exit nodes)
+- External network uses strict firewall rules
+
+Disable masquerade when:
+- You want to preserve source IPs for logging
+- The external network has proper return routes
+- You need end-to-end visibility
+</Accordion>
+
+<Accordion title="Use Peer Groups for Redundancy">
+For critical routes, use peer groups instead of single peers:
+
+```yaml
+PeerGroups: ["production-gateways"]
+```
+
+This provides automatic failover and better reliability.
+</Accordion>
+
+<Accordion title="Set Appropriate Metrics">
+Organize routes with logical metric values:
+
+```
+Specific routes:    100-500
+General routes:     500-1000  
+Exit nodes:         1000-9999
+```
+
+This makes route priority clear and easier to manage.
+</Accordion>
+
+<Accordion title="Limit Distribution Groups">
+Only distribute routes to peers that need them:
+
+```yaml
+Groups: ["remote-workers"]  # Not ["all-peers"]
+```
+
+This reduces routing table size and improves performance.
+</Accordion>
+
+## API Reference
+
+Key route management functions:
+
+```go
+// Get a specific route
+GetRoute(ctx, accountID, routeID, userID) (*Route, error)
+
+// List all routes
+ListRoutes(ctx, accountID, userID) ([]*Route, error)
+
+// Create a new route
+CreateRoute(ctx, accountID, prefix, networkType, domains, peerID, 
+    peerGroupIDs, description, netID, masquerade, metric, 
+    groups, accessControlGroupIDs, enabled, userID, 
+    keepRoute, skipAutoApply) (*Route, error)
+
+// Update a route
+SaveRoute(ctx, accountID, userID, route) error
+
+// Delete a route
+DeleteRoute(ctx, accountID, routeID, userID) error
+```
+
+## Related Resources
+
+- [Access Control](/network/access-control) - Overview of security model
+- [Groups](/network/groups) - Organize peers for routing
+- [Policies](/network/policies) - Control peer access
+- [DNS](/network/dns) - Private DNS configuration

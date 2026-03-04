@@ -1,0 +1,294 @@
+---
+title: Monitoring
+description: Monitor NetBird infrastructure with Prometheus metrics and health checks
+---
+
+NetBird components expose Prometheus metrics and health endpoints for comprehensive monitoring of your mesh network infrastructure.
+
+## Metrics Endpoint
+
+All NetBird server components expose metrics in Prometheus format at the `/metrics` endpoint.
+
+### Management Server Metrics
+
+The management server exposes metrics on a configurable port (default: 9090):
+
+```bash
+curl http://localhost:9090/metrics
+```
+
+#### Enable Metrics
+
+Metrics are enabled by default. Configure the metrics port in your management server:
+
+```bash
+netbird-mgmt --metrics-port 9090
+```
+
+<Info>
+Metrics use OpenTelemetry with Prometheus exporters for standardized observability.
+</Info>
+
+### Key Metrics to Monitor
+
+#### gRPC API Metrics
+
+Monitor peer connections and authentication:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `management.grpc.sync.request.counter` | Counter | Number of sync requests from peers |
+| `management.grpc.login.request.counter` | Counter | Number of login requests |
+| `management.grpc.login.request.blocked.counter` | Counter | Blocked login attempts |
+| `management.grpc.connected.streams` | Gauge | Active peer connections |
+| `management.grpc.login.request.duration.ms` | Histogram | Login request latency |
+| `management.grpc.sync.request.duration.ms` | Histogram | Sync request latency |
+| `management.grpc.updatechannel.queue` | Histogram | Update channel queue depth |
+
+<Warning>
+Monitor `management.grpc.login.request.high.latency.counter` - values above 7s indicate performance issues.
+</Warning>
+
+#### HTTP API Metrics
+
+Track REST API performance:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `management.http.request.counter` | Counter | HTTP requests by endpoint and method |
+| `management.http.response.counter` | Counter | HTTP responses by status code |
+| `management.http.request.duration.ms` | Histogram | Request duration by endpoint |
+| `management.http.request.counter.total` | Counter | Total HTTP requests |
+| `management.http.response.code.total` | Counter | Total responses by status code |
+
+#### Store Metrics
+
+Monitor database and persistence performance:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `management.store.global.lock.acquisition.duration.micro` | Histogram | Time to acquire store lock (µs) |
+| `management.store.global.lock.acquisition.duration.ms` | Histogram | Time holding store lock (ms) |
+| `management.store.persistence.duration.micro` | Histogram | Save/delete operation duration (µs) |
+| `management.store.transaction.duration.ms` | Histogram | Transaction duration (ms) |
+
+#### Account Manager Metrics
+
+Track network map calculation performance:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `management.account.update.account.peers.duration.ms` | Histogram | Peer update preparation time |
+| `management.account.get.peer.network.map.duration.ms` | Histogram | Network map calculation time |
+| `management.account.network.map.object.count` | Histogram | Objects in network map |
+| `management.account.peer.meta.update.counter` | Counter | Peer metadata updates |
+
+#### IDP Metrics
+
+Monitor identity provider integration:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `management.idp.authenticate.request.counter` | Counter | IDP authentication requests |
+| `management.idp.get.user.by.email.counter` | Counter | User lookup requests |
+| `management.idp.request.error.counter` | Counter | IDP request errors |
+| `management.idp.request.status.error.counter` | Counter | Non-2xx responses from IDP |
+
+## Health Checks
+
+### Relay Server Health
+
+Relay servers expose a health check endpoint at `/health`:
+
+```bash
+curl http://localhost:8080/health
+```
+
+**Response (healthy):**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-03-04T10:30:00Z",
+  "listeners": ["ws", "wss"],
+  "certificate_valid": true
+}
+```
+
+**Response (unhealthy):**
+```json
+{
+  "status": "unhealthy",
+  "timestamp": "2026-03-04T10:30:00Z",
+  "listeners": [],
+  "certificate_valid": false
+}
+```
+
+<Info>
+Health check responses are cached for 3 seconds to reduce overhead.
+</Info>
+
+### Management Server Health
+
+Check management server availability:
+
+```bash
+# gRPC API check
+grpcurl -plaintext localhost:33073 list
+
+# HTTP API check
+curl -k https://localhost:443/api/peers
+```
+
+## Prometheus Configuration
+
+Add NetBird components to your `prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: 'netbird-management'
+    static_configs:
+      - targets: ['management:9090']
+    scrape_interval: 30s
+
+  - job_name: 'netbird-signal'
+    static_configs:
+      - targets: ['signal:9090']
+    scrape_interval: 30s
+
+  - job_name: 'netbird-relay'
+    static_configs:
+      - targets: ['relay:9090']
+    scrape_interval: 30s
+```
+
+## Grafana Dashboards
+
+NetBird provides pre-built Grafana dashboards in the source repository:
+
+```bash
+infrastructure_files/observability/grafana/dashboards/
+├── management.json
+├── signal.json
+└── relay.json
+```
+
+Import these dashboards to visualize:
+- Active peer connections
+- Login and sync latencies
+- Network map distribution times
+- Store operation performance
+- Error rates and blocked requests
+
+## Docker Compose Monitoring Stack
+
+Example monitoring setup:
+
+```yaml
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - 9090:9090
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./dashboards:/etc/grafana/provisioning/dashboards
+    ports:
+      - 3000:3000
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+```
+
+## Alerting Rules
+
+<Accordion title="High Login Latency Alert">
+```yaml
+groups:
+  - name: netbird
+    interval: 30s
+    rules:
+      - alert: HighLoginLatency
+        expr: management_grpc_login_request_high_latency_counter > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High login latency detected"
+          description: "{{ $value }} login requests exceeded 7s threshold"
+```
+</Accordion>
+
+<Accordion title="Active Streams Alert">
+```yaml
+      - alert: NoActiveStreams
+        expr: management_grpc_connected_streams == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No active peer connections"
+          description: "Management server has no connected peers"
+```
+</Accordion>
+
+<Accordion title="Store Lock Contention Alert">
+```yaml
+      - alert: StoreLockContention
+        expr: histogram_quantile(0.95, management_store_global_lock_acquisition_duration_ms) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Store lock contention detected"
+          description: "95th percentile lock acquisition time exceeds 1s"
+```
+</Accordion>
+
+## What to Monitor
+
+<Steps>
+  <Step title="Peer Connectivity">
+    Monitor `management.grpc.connected.streams` to track active peers. Sudden drops indicate connectivity issues.
+  </Step>
+  
+  <Step title="API Performance">
+    Watch login and sync duration histograms. P95 latency should be under 1 second for healthy operations.
+  </Step>
+  
+  <Step title="Store Performance">
+    Track lock acquisition and persistence metrics. High values indicate database bottlenecks.
+  </Step>
+  
+  <Step title="Error Rates">
+    Monitor blocked requests and IDP errors. Spikes indicate authentication or authorization problems.
+  </Step>
+  
+  <Step title="Network Map Size">
+    Track `management.account.network.map.object.count`. Large values (>5000 objects) may impact performance.
+  </Step>
+</Steps>
+
+## Client Monitoring
+
+Clients don't expose metrics endpoints, but you can monitor client status:
+
+```bash
+# Check client status
+netbird status
+
+# Get detailed peer information
+netbird status --detail
+
+# Get JSON output for automation
+netbird status --json
+```
+
+<Info>
+Use `netbird status --json` to integrate client health checks into your monitoring system.
+</Info>

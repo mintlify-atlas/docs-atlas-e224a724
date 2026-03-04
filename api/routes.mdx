@@ -1,0 +1,420 @@
+---
+title: Routes API
+description: Manage network routes and exit nodes
+---
+
+The Routes API allows you to configure network routes, enabling peers to access external networks, subnets, or act as exit nodes for internet traffic.
+
+## List All Routes
+
+Returns a list of all configured routes.
+
+```bash
+GET /api/routes
+```
+
+<CodeGroup>
+```bash Request
+curl -X GET https://api.netbird.io/api/routes \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```json Response
+[
+  {
+    "id": "chacdk86lnnboviihd7g",
+    "network_id": "aws-vpc-1",
+    "network_type": "IPv4",
+    "description": "AWS VPC Route",
+    "enabled": true,
+    "peer": "chacbco6lnnbn6cg5s91",
+    "network": "10.0.0.0/16",
+    "metric": 9999,
+    "masquerade": true,
+    "groups": ["ch8i4ug6lnn4g9hqv7m0"],
+    "keep_route": false,
+    "access_control_groups": ["chacbco6lnnbn6cg5s91"]
+  }
+]
+```
+</CodeGroup>
+
+<ResponseField name="id" type="string">
+  Unique route identifier
+</ResponseField>
+
+<ResponseField name="network_id" type="string">
+  Route network identifier for grouping HA routes
+</ResponseField>
+
+<ResponseField name="network_type" type="string">
+  Network type: `IPv4`, `IPv6`, or `domain`
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Route description
+</ResponseField>
+
+<ResponseField name="enabled" type="boolean">
+  Whether the route is active
+</ResponseField>
+
+<ResponseField name="peer" type="string">
+  Peer ID acting as the routing peer
+</ResponseField>
+
+<ResponseField name="peer_groups" type="array">
+  Peer group IDs for HA routing (alternative to `peer`)
+</ResponseField>
+
+<ResponseField name="network" type="string">
+  Network range in CIDR format (conflicts with `domains`)
+</ResponseField>
+
+<ResponseField name="domains" type="array">
+  Domain list to dynamically resolve (max 32, conflicts with `network`)
+</ResponseField>
+
+<ResponseField name="metric" type="integer">
+  Route priority (lower number = higher priority, range: 1-9999)
+</ResponseField>
+
+<ResponseField name="masquerade" type="boolean">
+  Whether to masquerade (NAT) traffic to this route
+</ResponseField>
+
+<ResponseField name="groups" type="array">
+  Group IDs that can use this route
+</ResponseField>
+
+<ResponseField name="keep_route" type="boolean">
+  Keep route after domain resolution fails
+</ResponseField>
+
+<ResponseField name="access_control_groups" type="array">
+  Group IDs with access control permissions
+</ResponseField>
+
+## Get a Route
+
+Retrieve detailed information about a specific route.
+
+```bash
+GET /api/routes/{routeId}
+```
+
+<ParamField path="routeId" type="string" required>
+  The unique identifier of the route
+</ParamField>
+
+```bash Example
+curl -X GET https://api.netbird.io/api/routes/chacdk86lnnboviihd7g \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+## Create a Route
+
+Create a new network route.
+
+```bash
+POST /api/routes
+```
+
+<ParamField body="description" type="string" required>
+  Route description
+</ParamField>
+
+<ParamField body="network_id" type="string" required>
+  Network identifier for grouping HA routes (1-40 characters)
+</ParamField>
+
+<ParamField body="enabled" type="boolean" required>
+  Whether the route is active
+</ParamField>
+
+<ParamField body="peer" type="string">
+  Peer ID to use as routing peer (cannot be used with `peer_groups`)
+</ParamField>
+
+<ParamField body="peer_groups" type="array">
+  Peer group IDs for HA routing (cannot be used with `peer`)
+</ParamField>
+
+<ParamField body="network" type="string">
+  Network range in CIDR format (cannot be used with `domains`)
+</ParamField>
+
+<ParamField body="domains" type="array">
+  List of domains to resolve (max 32, cannot be used with `network`)
+</ParamField>
+
+<ParamField body="metric" type="integer" required>
+  Route priority (1-9999, lower = higher priority)
+</ParamField>
+
+<ParamField body="masquerade" type="boolean" required>
+  Enable NAT for traffic to this route
+</ParamField>
+
+<ParamField body="groups" type="array" required>
+  Group IDs that can use this route
+</ParamField>
+
+<ParamField body="keep_route" type="boolean" required>
+  Keep route after domain resolution fails
+</ParamField>
+
+<ParamField body="access_control_groups" type="array">
+  Group IDs with access control permissions
+</ParamField>
+
+<ParamField body="skip_auto_apply" type="boolean">
+  Skip auto-application for exit node routes (0.0.0.0/0)
+</ParamField>
+
+<CodeGroup>
+```bash Subnet Route
+curl -X POST https://api.netbird.io/api/routes \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Office Network",
+    "network_id": "office-lan",
+    "enabled": true,
+    "peer": "chacbco6lnnbn6cg5s91",
+    "network": "192.168.1.0/24",
+    "metric": 100,
+    "masquerade": true,
+    "groups": ["ch8i4ug6lnn4g9hqv7m0"],
+    "keep_route": false
+  }'
+```
+
+```bash Domain Route
+curl -X POST https://api.netbird.io/api/routes \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "AWS Services",
+    "network_id": "aws-services",
+    "enabled": true,
+    "peer": "chacbco6lnnbn6cg5s91",
+    "domains": ["*.amazonaws.com", "*.aws.com"],
+    "metric": 200,
+    "masquerade": true,
+    "groups": ["ch8i4ug6lnn4g9hqv7m0"],
+    "keep_route": true
+  }'
+```
+
+```bash Exit Node
+curl -X POST https://api.netbird.io/api/routes \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Exit Node - All Traffic",
+    "network_id": "exit-node",
+    "enabled": true,
+    "peer": "chacbco6lnnbn6cg5s91",
+    "network": "0.0.0.0/0",
+    "metric": 9999,
+    "masquerade": true,
+    "groups": ["ch8i4ug6lnn4g9hqv7m0"],
+    "keep_route": false,
+    "skip_auto_apply": false
+  }'
+```
+
+```json Response
+{
+  "id": "chacdk86lnnboviihd7g",
+  "network_id": "office-lan",
+  "network_type": "IPv4",
+  "description": "Office Network",
+  "enabled": true,
+  "peer": "chacbco6lnnbn6cg5s91",
+  "network": "192.168.1.0/24",
+  "metric": 100,
+  "masquerade": true,
+  "groups": ["ch8i4ug6lnn4g9hqv7m0"],
+  "keep_route": false
+}
+```
+</CodeGroup>
+
+## Update a Route
+
+Update an existing route configuration.
+
+```bash
+PUT /api/routes/{routeId}
+```
+
+<ParamField path="routeId" type="string" required>
+  The unique identifier of the route
+</ParamField>
+
+```bash Example
+curl -X PUT https://api.netbird.io/api/routes/chacdk86lnnboviihd7g \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Updated Office Network",
+    "network_id": "office-lan",
+    "enabled": true,
+    "peer": "chacbco6lnnbn6cg5s91",
+    "network": "192.168.1.0/24",
+    "metric": 50,
+    "masquerade": true,
+    "groups": ["ch8i4ug6lnn4g9hqv7m0"],
+    "keep_route": false
+  }'
+```
+
+## Delete a Route
+
+Remove a route from the network.
+
+```bash
+DELETE /api/routes/{routeId}
+```
+
+<ParamField path="routeId" type="string" required>
+  The unique identifier of the route
+</ParamField>
+
+```bash Example
+curl -X DELETE https://api.netbird.io/api/routes/chacdk86lnnboviihd7g \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+## Route Types
+
+### Subnet Routes
+
+Route traffic to specific IP subnets:
+
+```json
+{
+  "network": "10.0.0.0/16",
+  "description": "AWS VPC"
+}
+```
+
+Use cases:
+- Access cloud VPCs
+- Connect to office LANs
+- Reach private data centers
+
+### Domain Routes
+
+Dynamically route traffic to resolved domains:
+
+```json
+{
+  "domains": ["*.internal.company.com", "api.example.com"],
+  "keep_route": true
+}
+```
+
+Use cases:
+- Route to dynamic cloud services
+- Access internal services by domain
+- Support wildcard domain routing
+
+<Note>
+Domain routes are resolved periodically. Set `keep_route: true` to maintain connectivity even if resolution temporarily fails.
+</Note>
+
+### Exit Nodes
+
+Route all internet traffic through a peer:
+
+```json
+{
+  "network": "0.0.0.0/0",
+  "masquerade": true,
+  "metric": 9999
+}
+```
+
+Use cases:
+- Secure public WiFi connections
+- Access region-specific content
+- Centralize internet egress
+
+## High Availability Routing
+
+Use multiple routing peers for redundancy:
+
+```json
+{
+  "network_id": "ha-route-1",
+  "peer_groups": [
+    "routing-peers-group-id"
+  ],
+  "network": "10.0.0.0/16"
+}
+```
+
+Peers in the group automatically provide failover.
+
+## Route Priority
+
+Control route selection with metrics:
+
+<CardGroup cols={3}>
+  <Card title="High Priority">
+    `metric: 1-100`
+    
+    Preferred routes
+  </Card>
+  <Card title="Medium Priority">
+    `metric: 101-1000`
+    
+    Normal routes
+  </Card>
+  <Card title="Low Priority">
+    `metric: 1001-9999`
+    
+    Backup/exit nodes
+  </Card>
+</CardGroup>
+
+## Masquerading (NAT)
+
+Enable masquerading to NAT traffic:
+
+```json
+{
+  "masquerade": true
+}
+```
+
+Required when:
+- Routing peer doesn't have routes back to NetBird network
+- Acting as an exit node
+- Accessing external networks that don't know about NetBird IPs
+
+## Access Control
+
+Limit which groups can use the route:
+
+```json
+{
+  "groups": ["engineering-group-id"],
+  "access_control_groups": ["admins-group-id"]
+}
+```
+
+- `groups`: Who can use the route
+- `access_control_groups`: Who can manage the route
+
+## Best Practices
+
+<Check>**Use specific metrics** - Assign appropriate priorities based on route importance</Check>
+<Check>**Enable masquerading** - Always enable for exit nodes and external networks</Check>
+<Check>**Group related routes** - Use `network_id` to organize related routes</Check>
+<Check>**Use HA groups** - Deploy multiple routing peers for critical routes</Check>
+<Check>**Monitor domain resolution** - Check domain routes resolve correctly</Check>
+<Check>**Limit access** - Only give route access to groups that need it</Check>

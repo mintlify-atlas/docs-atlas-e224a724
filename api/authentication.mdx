@@ -1,0 +1,228 @@
+---
+title: Authentication
+description: Authenticate with the NetBird API using Personal Access Tokens
+---
+
+The NetBird API supports two authentication methods:
+
+1. **Personal Access Tokens** (recommended for API access)
+2. **Bearer Tokens (JWT)** (used for dashboard authentication)
+
+## Personal Access Tokens
+
+Personal Access Tokens (PATs) are the recommended way to authenticate API requests. They provide secure, long-lived credentials for programmatic access.
+
+### Creating a Personal Access Token
+
+<Steps>
+  <Step title="Navigate to Settings">
+    In the NetBird dashboard, go to **Settings** > **Personal Access Tokens**
+  </Step>
+  
+  <Step title="Generate Token">
+    Click **Create Token** and provide:
+    - **Name**: A descriptive name for the token
+    - **Expiration**: Token validity period (1-365 days)
+  </Step>
+  
+  <Step title="Save Token">
+    Copy the token immediately - it won't be shown again!
+  </Step>
+</Steps>
+
+### Using the Token
+
+Include the token in the `Authorization` header with the `Token` prefix:
+
+```bash
+curl -X GET https://api.netbird.io/api/users \
+  -H "Authorization: Token nbp_1234567890abcdef..."
+```
+
+<CodeGroup>
+```bash cURL
+curl -X GET https://api.netbird.io/api/users \
+  -H "Authorization: Token nbp_YOUR_TOKEN_HERE" \
+  -H "Content-Type: application/json"
+```
+
+```python Python
+import requests
+
+token = "nbp_YOUR_TOKEN_HERE"
+headers = {
+    "Authorization": f"Token {token}",
+    "Content-Type": "application/json"
+}
+
+response = requests.get(
+    "https://api.netbird.io/api/users",
+    headers=headers
+)
+```
+
+```javascript JavaScript
+const token = 'nbp_YOUR_TOKEN_HERE';
+
+const response = await fetch('https://api.netbird.io/api/users', {
+  headers: {
+    'Authorization': `Token ${token}`,
+    'Content-Type': 'application/json'
+  }
+});
+```
+
+```go Go
+package main
+
+import (
+    "net/http"
+)
+
+func main() {
+    token := "nbp_YOUR_TOKEN_HERE"
+    
+    req, _ := http.NewRequest("GET", "https://api.netbird.io/api/users", nil)
+    req.Header.Set("Authorization", "Token "+token)
+    req.Header.Set("Content-Type", "application/json")
+    
+    client := &http.Client{}
+    resp, _ := client.Do(req)
+    defer resp.Body.Close()
+}
+```
+</CodeGroup>
+
+## Managing Tokens via API
+
+### Create a Personal Access Token
+
+<Note>
+You need to be authenticated (with an existing token or JWT) to create new tokens programmatically.
+</Note>
+
+```bash Create Token
+POST /api/users/{userId}/tokens
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier of the user
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Name of the token
+</ParamField>
+
+<ParamField body="expires_in" type="integer" required>
+  Expiration time in days (1-365)
+</ParamField>
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.netbird.io/api/users/google-oauth2|123456/tokens \
+  -H "Authorization: Token nbp_EXISTING_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "CI/CD Token",
+    "expires_in": 90
+  }'
+```
+
+```json Response
+{
+  "plain_token": "nbp_abc123def456...",
+  "personal_access_token": {
+    "id": "ch8i54g6lnn4g9hqv7n0",
+    "name": "CI/CD Token",
+    "expiration_date": "2024-06-15T14:38:28.977616Z",
+    "created_by": "google-oauth2|123456",
+    "created_at": "2024-03-15T14:48:20.465209Z"
+  }
+}
+```
+</CodeGroup>
+
+<Warning>
+The `plain_token` is only returned once when the token is created. Store it securely!
+</Warning>
+
+### List Personal Access Tokens
+
+```bash List Tokens
+GET /api/users/{userId}/tokens
+```
+
+```bash Example
+curl -X GET https://api.netbird.io/api/users/google-oauth2|123456/tokens \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+<ResponseField name="id" type="string">
+  Token ID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Token name
+</ResponseField>
+
+<ResponseField name="expiration_date" type="string">
+  When the token expires (ISO 8601 format)
+</ResponseField>
+
+<ResponseField name="last_used" type="string">
+  Last time the token was used (ISO 8601 format)
+</ResponseField>
+
+### Delete a Personal Access Token
+
+```bash Delete Token
+DELETE /api/users/{userId}/tokens/{tokenId}
+```
+
+```bash Example
+curl -X DELETE https://api.netbird.io/api/users/google-oauth2|123456/tokens/ch8i54g6lnn4g9hqv7n0 \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+## Bearer Token (JWT)
+
+Bearer tokens are JWT tokens obtained through OAuth2 authentication flow. They're primarily used by the NetBird dashboard.
+
+### Using Bearer Tokens
+
+Include the JWT in the `Authorization` header with the `Bearer` prefix:
+
+```bash
+curl -X GET https://api.netbird.io/api/users \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+## Authentication Errors
+
+<ResponseField name="401 Unauthorized">
+  Missing or invalid authentication credentials
+  
+  ```json
+  {
+    "message": "unauthorized"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="403 Forbidden">
+  Authenticated but insufficient permissions
+  
+  ```json
+  {
+    "message": "forbidden"
+  }
+  ```
+</ResponseField>
+
+## Best Practices
+
+<Check>**Rotate tokens regularly** - Set appropriate expiration periods and rotate tokens before they expire</Check>
+<Check>**Use minimal permissions** - Create service users with limited roles for automation</Check>
+<Check>**Store securely** - Never commit tokens to version control; use environment variables or secret managers</Check>
+<Check>**Monitor usage** - Check the `last_used` field to identify unused tokens</Check>
+<Check>**Revoke compromised tokens** - Immediately delete any tokens that may be compromised</Check>

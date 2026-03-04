@@ -1,122 +1,141 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "NetBird",
+  "theme": "aspen",
+  "mode": "custom",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#f37836",
+    "light": "#ebc492",
+    "dark": "#f4f4f4"
   },
   "favicon": "/favicon.svg",
+  "logo": {
+    "light": "https://media.brand.dev/d090d775-d839-4c65-8948-33464a1b876e.svg",
+    "dark": "https://media.brand.dev/d090d775-d839-4c65-8948-33464a1b876e.svg"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/netbirdio/netbird"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/netbirdio/netbird"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Architecture",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "architecture/overview",
+              "architecture/how-it-works",
+              "architecture/components"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Deployment",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "deployment/self-hosted",
+              "deployment/docker-compose",
+              "deployment/kubernetes",
+              "deployment/cloud"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Client Setup",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "clients/linux",
+              "clients/macos",
+              "clients/windows",
+              "clients/mobile",
+              "clients/docker"
+            ]
+          },
+          {
+            "group": "Network Management",
+            "pages": [
+              "network/access-control",
+              "network/groups",
+              "network/policies",
+              "network/routes",
+              "network/dns"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "security/sso-setup",
+              "security/mfa",
+              "security/posture-checks",
+              "security/quantum-resistance"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "operations/monitoring",
+              "operations/logging",
+              "operations/troubleshooting",
+              "operations/upgrading"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Getting Started",
             "pages": [
-              "api-reference/introduction"
+              "api/overview",
+              "api/authentication"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Resources",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/users",
+              "api/peers",
+              "api/groups",
+              "api/policies",
+              "api/routes",
+              "api/dns",
+              "api/setup-keys",
+              "api/events"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI Reference",
+        "groups": [
+          {
+            "group": "Commands",
+            "pages": [
+              "cli/overview",
+              "cli/up",
+              "cli/down",
+              "cli/status",
+              "cli/login",
+              "cli/service",
+              "cli/routes"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

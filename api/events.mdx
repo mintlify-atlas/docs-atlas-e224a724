@@ -1,0 +1,543 @@
+---
+title: Events API
+description: View audit logs and activity events
+---
+
+The Events API provides access to audit logs and activity events in your NetBird network, enabling compliance, monitoring, and security analysis.
+
+## Audit Events
+
+Audit events track administrative actions and system changes.
+
+### List All Audit Events
+
+```bash
+GET /api/events/audit
+```
+
+<CodeGroup>
+```bash Request
+curl -X GET https://api.netbird.io/api/events/audit \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```json Response
+[
+  {
+    "id": "10",
+    "timestamp": "2023-05-05T10:04:37.473542Z",
+    "activity": "Route created",
+    "activity_code": "route.add",
+    "initiator_id": "google-oauth2|123456789012345678901",
+    "initiator_name": "John Doe",
+    "initiator_email": "demo@netbird.io",
+    "target_id": "chad9d86lnnc59g18ou0",
+    "meta": {
+      "name": "my route",
+      "network_range": "10.64.0.0/24",
+      "peer_id": "chacbco6lnnbn6cg5s91"
+    }
+  }
+]
+```
+</CodeGroup>
+
+<ResponseField name="id" type="string">
+  Unique event identifier
+</ResponseField>
+
+<ResponseField name="timestamp" type="string">
+  When the event occurred (ISO 8601 format)
+</ResponseField>
+
+<ResponseField name="activity" type="string">
+  Human-readable description of the activity
+</ResponseField>
+
+<ResponseField name="activity_code" type="string">
+  Machine-readable activity code
+</ResponseField>
+
+<ResponseField name="initiator_id" type="string">
+  ID of the user who triggered the event
+</ResponseField>
+
+<ResponseField name="initiator_name" type="string">
+  Name of the user who triggered the event
+</ResponseField>
+
+<ResponseField name="initiator_email" type="string">
+  Email of the user who triggered the event
+</ResponseField>
+
+<ResponseField name="target_id" type="string">
+  ID of the resource affected by the event
+</ResponseField>
+
+<ResponseField name="meta" type="object">
+  Additional event metadata
+</ResponseField>
+
+## Activity Codes
+
+Events are categorized by activity codes for easy filtering and monitoring.
+
+### User Events
+
+<CodeGroup>
+```text User Management
+user.join
+user.invite
+user.create
+user.delete
+user.block
+user.unblock
+user.role.update
+user.approve
+user.reject
+user.peer.login
+user.password.change
+```
+
+```text User Invites
+user.invite.link.create
+user.invite.link.accept
+user.invite.link.regenerate
+user.invite.link.delete
+```
+</CodeGroup>
+
+### Peer Events
+
+<CodeGroup>
+```text Peer Management
+peer.user.add
+peer.setupkey.add
+peer.group.add
+peer.group.delete
+user.peer.delete
+peer.rename
+peer.ip.update
+```
+
+```text Peer Configuration
+peer.ssh.enable
+peer.ssh.disable
+peer.login.expiration.enable
+peer.login.expiration.disable
+peer.inactivity.expiration.enable
+peer.inactivity.expiration.disable
+peer.login.expire
+```
+
+```text Peer Approval
+peer.approve
+peer.approval.revoke
+```
+
+```text Jobs
+peer.job.create
+```
+</CodeGroup>
+
+### Policy & Rule Events
+
+```text
+policy.add
+policy.update
+policy.delete
+rule.add
+rule.update
+rule.delete
+posture.check.create
+posture.check.update
+posture.check.delete
+```
+
+### Network Events
+
+<CodeGroup>
+```text Routes
+route.add
+route.update
+route.delete
+```
+
+```text Groups
+group.add
+group.update
+group.delete
+user.group.add
+user.group.delete
+setupkey.group.add
+setupkey.group.delete
+resource.group.add
+resource.group.delete
+```
+
+```text Networks
+network.create
+network.update
+network.delete
+network.resource.create
+network.resource.update
+network.resource.delete
+network.router.create
+network.router.update
+network.router.delete
+```
+</CodeGroup>
+
+### DNS Events
+
+<CodeGroup>
+```text Nameservers
+nameserver.group.add
+nameserver.group.update
+nameserver.group.delete
+dns.setting.disabled.management.group.add
+dns.setting.disabled.management.group.delete
+```
+
+```text DNS Zones
+dns.zone.create
+dns.zone.update
+dns.zone.delete
+dns.zone.record.create
+dns.zone.record.update
+dns.zone.record.delete
+```
+</CodeGroup>
+
+### Setup Key Events
+
+```text
+setupkey.add
+setupkey.update
+setupkey.revoke
+setupkey.overuse
+setupkey.delete
+```
+
+### Token Events
+
+```text
+personal.access.token.create
+personal.access.token.delete
+```
+
+### Account Events
+
+<CodeGroup>
+```text Account Management
+account.create
+account.delete
+dashboard.login
+transferred.owner.role
+```
+
+```text Account Settings
+account.setting.peer.login.expiration.update
+account.setting.peer.login.expiration.enable
+account.setting.peer.login.expiration.disable
+account.peer.inactivity.expiration.enable
+account.peer.inactivity.expiration.disable
+account.peer.inactivity.expiration.update
+account.setting.peer.approval.enable
+account.setting.peer.approval.disable
+account.setting.group.propagation.enable
+account.setting.group.propagation.disable
+account.setting.routing.peer.dns.resolution.enable
+account.setting.routing.peer.dns.resolution.disable
+account.setting.lazy.connection.enable
+account.setting.lazy.connection.disable
+account.dns.domain.update
+account.network.range.update
+account.settings.auto.version.update
+```
+</CodeGroup>
+
+### Integration Events
+
+```text
+integration.create
+integration.update
+integration.delete
+identityprovider.create
+identityprovider.update
+identityprovider.delete
+service.create
+service.update
+service.delete
+```
+
+## Network Traffic Events
+
+<Note>
+Network traffic events are a Cloud-only experimental feature that tracks network flows between peers.
+</Note>
+
+### List Network Traffic Events
+
+```bash
+GET /api/events/network-traffic
+```
+
+<ParamField query="page" type="integer" default="1">
+  Page number
+</ParamField>
+
+<ParamField query="page_size" type="integer" default="1000">
+  Items per page (max 50000)
+</ParamField>
+
+<ParamField query="user_id" type="string">
+  Filter by user ID
+</ParamField>
+
+<ParamField query="reporter_id" type="string">
+  Filter by reporter (peer) ID
+</ParamField>
+
+<ParamField query="protocol" type="integer">
+  Filter by protocol (1=ICMP, 6=TCP, 17=UDP)
+</ParamField>
+
+<ParamField query="type" type="string">
+  Filter by event type: `TYPE_START`, `TYPE_END`, `TYPE_DROP`
+</ParamField>
+
+<ParamField query="connection_type" type="string">
+  Filter by connection: `P2P` or `ROUTED`
+</ParamField>
+
+<ParamField query="direction" type="string">
+  Filter by direction: `INGRESS`, `EGRESS`
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search user email, source/destination names and addresses
+</ParamField>
+
+<ParamField query="start_date" type="string">
+  Start date filter (ISO 8601)
+</ParamField>
+
+<ParamField query="end_date" type="string">
+  End date filter (ISO 8601)
+</ParamField>
+
+<CodeGroup>
+```bash Request
+curl -X GET "https://api.netbird.io/api/events/network-traffic?page=1&page_size=100" \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```json Response
+{
+  "data": [
+    {
+      "flow_id": "61092452-b17c-4b14-b7cf-a2158c549826",
+      "reporter_id": "ch8i4ug6lnn4g9hqv7m0",
+      "source": {
+        "id": "peer_123",
+        "type": "PEER",
+        "name": "laptop-01",
+        "address": "100.64.0.10:51820",
+        "geo_location": {
+          "city_name": "Berlin",
+          "country_code": "DE"
+        }
+      },
+      "destination": {
+        "id": "peer_456",
+        "type": "PEER",
+        "name": "server-01",
+        "address": "100.64.0.15:443"
+      },
+      "user": {
+        "id": "google-oauth2|123456",
+        "email": "alice@netbird.io",
+        "name": "Alice Smith"
+      },
+      "policy": {
+        "id": "policy_789",
+        "name": "Allow HTTPS"
+      },
+      "protocol": 6,
+      "direction": "EGRESS",
+      "rx_bytes": 1234,
+      "rx_packets": 5,
+      "tx_bytes": 1234,
+      "tx_packets": 5,
+      "events": [
+        {
+          "type": "TYPE_START",
+          "timestamp": "2025-03-20T16:23:58.125397Z"
+        }
+      ]
+    }
+  ],
+  "page": 1,
+  "page_size": 100,
+  "total_records": 523,
+  "total_pages": 6
+}
+```
+</CodeGroup>
+
+## Reverse Proxy Access Logs
+
+View access logs for reverse proxy services (NetBird Cloud feature).
+
+### List Proxy Access Logs
+
+```bash
+GET /api/events/proxy
+```
+
+<ParamField query="page" type="integer" default="1">
+  Page number
+</ParamField>
+
+<ParamField query="page_size" type="integer" default="50">
+  Items per page (max 100)
+</ParamField>
+
+<ParamField query="sort_by" type="string" default="timestamp">
+  Field to sort by: `timestamp`, `url`, `host`, `path`, `method`, `status_code`, `duration`, `source_ip`, `user_id`, `auth_method`, `reason`
+</ParamField>
+
+<ParamField query="sort_order" type="string" default="desc">
+  Sort order: `asc` or `desc`
+</ParamField>
+
+<ParamField query="search" type="string">
+  General search across fields
+</ParamField>
+
+<ParamField query="host" type="string">
+  Filter by host header
+</ParamField>
+
+<ParamField query="method" type="string">
+  Filter by HTTP method
+</ParamField>
+
+<ParamField query="status_code" type="integer">
+  Filter by HTTP status code
+</ParamField>
+
+<ParamField query="start_date" type="string">
+  Start date filter (RFC3339 format)
+</ParamField>
+
+<ParamField query="end_date" type="string">
+  End date filter (RFC3339 format)
+</ParamField>
+
+```bash Example
+curl -X GET "https://api.netbird.io/api/events/proxy?page=1&page_size=50" \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+## Event Monitoring Strategies
+
+### Security Monitoring
+
+Monitor security-relevant events:
+
+```bash
+# Watch for user account changes
+activity_code: user.role.update
+activity_code: user.block
+activity_code: user.create
+
+# Watch for policy changes
+activity_code: policy.delete
+activity_code: rule.update
+
+# Watch for setup key usage
+activity_code: setupkey.overuse
+activity_code: peer.setupkey.add
+```
+
+### Compliance Auditing
+
+Track administrative actions:
+
+```bash
+# Configuration changes
+activity_code: account.setting.*
+activity_code: network.*
+activity_code: route.*
+
+# Access control changes
+activity_code: policy.*
+activity_code: group.*
+```
+
+### Operational Monitoring
+
+Monitor network health:
+
+```bash
+# Peer connectivity
+activity_code: peer.user.add
+activity_code: user.peer.delete
+activity_code: peer.login.expire
+
+# DNS changes
+activity_code: dns.zone.*
+activity_code: nameserver.group.*
+```
+
+## Integration Examples
+
+### SIEM Integration
+
+Forward events to your SIEM:
+
+```python
+import requests
+import time
+
+def fetch_events():
+    response = requests.get(
+        "https://api.netbird.io/api/events/audit",
+        headers={"Authorization": f"Token {token}"}
+    )
+    return response.json()
+
+# Poll for new events every minute
+while True:
+    events = fetch_events()
+    for event in events:
+        send_to_siem(event)
+    time.sleep(60)
+```
+
+### Webhook Notifications
+
+Send critical events to Slack/Discord:
+
+```python
+def check_critical_events(events):
+    critical_codes = [
+        "user.role.update",
+        "policy.delete",
+        "account.delete"
+    ]
+    
+    for event in events:
+        if event["activity_code"] in critical_codes:
+            notify_team(event)
+```
+
+## Best Practices
+
+<Check>**Regular audits** - Review audit logs regularly for suspicious activity</Check>
+<Check>**Alert on critical events** - Set up monitoring for security-relevant changes</Check>
+<Check>**Retain logs** - Export and archive events for compliance requirements</Check>
+<Check>**Filter effectively** - Use activity codes to focus on relevant events</Check>
+<Check>**Monitor anomalies** - Watch for unusual patterns in event data</Check>

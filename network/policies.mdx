@@ -1,0 +1,494 @@
+---
+title: Policies
+description: Define network access rules with NetBird policies
+---
+
+# Policies
+
+Policies define the access control rules that determine which peers can communicate with each other in your NetBird network. Each policy contains one or more rules that specify allowed connections between groups.
+
+## Policy Structure
+
+A NetBird policy consists of:
+
+```go
+type Policy struct {
+    ID                  string       // Unique identifier
+    Name                string       // Policy name
+    Description         string       // Purpose and details
+    Enabled             bool         // Active status
+    Rules               []*PolicyRule // Access rules
+    SourcePostureChecks []string     // Security requirements
+}
+```
+
+### Policy Components
+
+- **Name and Description**: Identify the policy and explain its purpose
+- **Enabled Status**: Control whether the policy is active without deleting it
+- **Rules**: One or more rules defining allowed traffic patterns
+- **Source Posture Checks**: Optional security requirements for source peers
+
+## Policy Rules
+
+Each rule within a policy defines specific access permissions:
+
+```go
+type PolicyRule struct {
+    ID                  string                  // Rule identifier
+    Name                string                  // Rule name
+    Description         string                  // Rule purpose
+    Enabled             bool                    // Rule status
+    Sources             []string                // Source group IDs
+    Destinations        []string                // Destination group IDs
+    Bidirectional       bool                    // Two-way traffic
+    Protocol            PolicyRuleProtocolType  // Traffic type
+    Ports               []string                // Port specifications
+    Action              PolicyTrafficActionType // Accept or drop
+}
+```
+
+### Rule Components
+
+<Accordion title="Source and Destination Groups">
+Rules specify traffic flow between groups:
+
+- **Sources**: Groups containing peers that initiate connections
+- **Destinations**: Groups containing peers that receive connections
+
+Example:
+```
+Sources: ["remote-workers"]
+Destinations: ["app-servers"]
+→ Remote workers can connect to app servers
+```
+</Accordion>
+
+<Accordion title="Protocol Types">
+NetBird supports several protocol types:
+
+- `all`: All traffic types (default)
+- `tcp`: TCP traffic only
+- `udp`: UDP traffic only  
+- `icmp`: ICMP/ping traffic
+- `netbird-ssh`: NetBird's built-in SSH access
+
+From the source code:
+```go
+const (
+    PolicyRuleProtocolALL        = "all"
+    PolicyRuleProtocolTCP        = "tcp"
+    PolicyRuleProtocolUDP        = "udp"
+    PolicyRuleProtocolICMP       = "icmp"
+    PolicyRuleProtocolNetbirdSSH = "netbird-ssh"
+)
+```
+</Accordion>
+
+<Accordion title="Port Specifications">
+Define allowed ports for TCP/UDP protocols:
+
+- **Single port**: `"443"`, `"22"`, `"3306"`
+- **Port range**: `"8000-8999"`, `"49152-65535"`
+- **Multiple specifications**: `["80", "443", "8080-8090"]`
+
+Ports are stored as ranges internally:
+```go
+type RulePortRange struct {
+    Start uint16
+    End   uint16
+}
+```
+
+Examples:
+- Port 443: `{Start: 443, End: 443}`
+- Range 8000-8999: `{Start: 8000, End: 8999}`
+</Accordion>
+
+<Accordion title="Traffic Direction">
+Control the direction of allowed traffic:
+
+- **Unidirectional** (`Bidirectional: false`): Traffic flows only from sources to destinations
+- **Bidirectional** (`Bidirectional: true`): Traffic flows in both directions
+
+Example:
+```
+Unidirectional:
+  remote-workers → app-servers ✓
+  app-servers → remote-workers ✗
+
+Bidirectional:
+  remote-workers ↔ app-servers ✓
+```
+
+<Note>
+When using protocol "all", the rule is automatically made bidirectional for compatibility.
+</Note>
+</Accordion>
+
+<Accordion title="Traffic Actions">
+Currently, NetBird supports:
+
+- `accept`: Allow matching traffic (default and primary use case)
+- `drop`: Block matching traffic (reserved for future use)
+
+```go
+const (
+    PolicyTrafficActionAccept = "accept"
+    PolicyTrafficActionDrop   = "drop"
+)
+```
+</Accordion>
+
+## Creating Policies
+
+<Steps>
+
+### Define the Policy
+
+Create a policy with a descriptive name:
+
+```
+Name: "Remote Access to Production"
+Description: "Allow remote workers to access production application servers on HTTPS"
+Enabled: true
+```
+
+### Add Rules
+
+Define one or more rules within the policy:
+
+```
+Rule 1: "HTTPS Access"
+├── Sources: ["remote-workers"]
+├── Destinations: ["prod-app-servers"]
+├── Protocol: tcp
+├── Ports: ["443"]
+└── Bidirectional: false
+
+Rule 2: "SSH Access"
+├── Sources: ["remote-workers"]
+├── Destinations: ["prod-app-servers"]
+├── Protocol: tcp
+├── Ports: ["22"]
+└── Bidirectional: false
+```
+
+### Optional: Add Posture Checks
+
+Attach security requirements to the source peers:
+
+```
+SourcePostureChecks: ["os-version-check", "geolocation-check"]
+```
+
+### Save and Enable
+
+The policy takes effect immediately when saved and enabled.
+
+</Steps>
+
+## Policy Examples
+
+### Allow Full Internal Communication
+
+```yaml
+Name: "Engineering Team Access"
+Description: "Allow all communication within engineering team"
+Enabled: true
+
+Rules:
+  - Sources: ["engineering-team"]
+    Destinations: ["engineering-team"]
+    Protocol: all
+    Bidirectional: true
+    Action: accept
+```
+
+### Restricted Database Access
+
+```yaml
+Name: "Database Access Policy"
+Description: "Allow app servers to access databases on MySQL port"
+Enabled: true
+
+Rules:
+  - Sources: ["app-servers"]
+    Destinations: ["database-servers"]
+    Protocol: tcp
+    Ports: ["3306"]
+    Bidirectional: false
+    Action: accept
+```
+
+### Multi-Protocol Web Access
+
+```yaml
+Name: "Web Server Access"
+Description: "Allow clients to access web servers via HTTP/HTTPS"
+Enabled: true
+
+Rules:
+  - Name: "HTTP and HTTPS"
+    Sources: ["client-devices"]
+    Destinations: ["web-servers"]
+    Protocol: tcp
+    Ports: ["80", "443"]
+    Bidirectional: false
+    Action: accept
+    
+  - Name: "Ping Test"
+    Sources: ["client-devices"]
+    Destinations: ["web-servers"]
+    Protocol: icmp
+    Bidirectional: true
+    Action: accept
+```
+
+### SSH with Posture Checks
+
+```yaml
+Name: "Admin SSH Access"
+Description: "Allow admins to SSH into servers with security checks"
+Enabled: true
+SourcePostureChecks: ["os-up-to-date", "approved-location"]
+
+Rules:
+  - Sources: ["admin-team"]
+    Destinations: ["all-servers"]
+    Protocol: tcp
+    Ports: ["22"]
+    Bidirectional: false
+    Action: accept
+```
+
+## Default Policy
+
+When you create a NetBird account, a default policy is automatically created:
+
+```go
+const (
+    DefaultPolicyName        = "Default"
+    DefaultPolicyDescription = "This is a default policy that allows 
+                                connections between all the resources"
+)
+```
+
+This policy allows all peers to communicate freely. You can:
+- **Disable it** to enforce zero-trust security
+- **Modify it** to restrict access
+- **Delete it** to start with a clean slate
+
+<Warning>
+Disabling or deleting the default policy will immediately block all peer-to-peer communication. Ensure you have appropriate policies in place before removing the default policy.
+</Warning>
+
+## Policy Validation
+
+NetBird validates policies when creating or updating them:
+
+```go
+// From policy.go:validatePolicy
+func validatePolicy(ctx context.Context, transaction store.Store, 
+    accountID string, policy *Policy) error
+```
+
+Validation checks:
+
+1. **Group existence**: All source and destination groups must exist
+2. **Posture check existence**: Referenced posture checks must be valid
+3. **Rule IDs**: When updating, rule IDs must match existing rules
+4. **Auto-generated IDs**: New policies get automatic unique IDs
+
+```go
+if policy.ID == "" {
+    policy.ID = xid.New().String()
+    policy.AccountID = accountID
+}
+```
+
+## Policy Updates and Network Impact
+
+When you modify a policy, NetBird intelligently determines if peer configurations need updating:
+
+```go
+// From policy.go:arePolicyChangesAffectPeers
+func arePolicyChangesAffectPeers(ctx context.Context, transaction store.Store, 
+    accountID string, policy *Policy, isUpdate bool) (bool, error)
+```
+
+Peer updates are triggered only when:
+- The policy is enabled (or becomes enabled)
+- Referenced groups contain peers or resources
+- The policy rules reference network resources
+
+This optimization minimizes unnecessary network updates and peer configuration changes.
+
+## Policy Best Practices
+
+<Accordion title="Use Descriptive Names and Documentation">
+Clearly name policies and rules to reflect their purpose:
+
+✅ Good:
+```
+Policy: "Production Database Access"
+Rule: "Allow App Servers to MySQL"
+Description: "Permits application servers to query production 
+             MySQL databases on port 3306"
+```
+
+❌ Bad:
+```
+Policy: "Policy 1"
+Rule: "Rule 1"
+Description: ""
+```
+</Accordion>
+
+<Accordion title="Apply Least Privilege">
+Grant only the minimum access necessary:
+
+✅ Good:
+```
+Protocol: tcp
+Ports: ["443"]  # Only HTTPS
+Bidirectional: false  # One-way only
+```
+
+❌ Bad:
+```
+Protocol: all  # All protocols
+Bidirectional: true  # Both directions
+```
+</Accordion>
+
+<Accordion title="Group Related Rules in a Policy">
+Organize rules that serve a common purpose into a single policy:
+
+```
+Policy: "Web Service Access"
+Rules:
+  - HTTP/HTTPS traffic (ports 80, 443)
+  - ICMP for health checks
+  - SSH for administration (port 22)
+```
+
+This makes management easier and clearly shows the access pattern.
+</Accordion>
+
+<Accordion title="Use Posture Checks for Sensitive Access">
+Add security requirements to policies protecting critical resources:
+
+```
+Policy: "Financial Database Access"
+SourcePostureChecks:
+  - os-version-check  # Ensure up-to-date OS
+  - geolocation-check  # Verify location
+  - custom-compliance-check  # Custom security validation
+```
+</Accordion>
+
+<Accordion title="Regularly Review and Audit Policies">
+- Review policies quarterly to ensure they still reflect business needs
+- Remove or disable unused policies
+- Check activity logs for denied access attempts
+- Validate that groups still contain appropriate peers
+</Accordion>
+
+## Policy Lifecycle
+
+### Creating a Policy
+
+```go
+SavePolicy(ctx, accountID, userID, policy, create=true)
+```
+
+1. Policy is validated (groups, posture checks exist)
+2. Unique ID is generated
+3. Policy is stored in the database
+4. Network serial is incremented
+5. Activity event is logged
+6. Affected peers receive updates (if applicable)
+
+### Updating a Policy
+
+```go
+SavePolicy(ctx, accountID, userID, policy, create=false)
+```
+
+1. Existing policy is retrieved
+2. New policy is validated
+3. Changes are compared to determine peer impact
+4. Policy is saved
+5. Network serial is incremented
+6. Activity event is logged
+7. Affected peers receive updates (if necessary)
+
+### Deleting a Policy
+
+```go
+DeletePolicy(ctx, accountID, policyID, userID)
+```
+
+1. Policy is retrieved
+2. Peer impact is assessed
+3. Policy is deleted from database
+4. Network serial is incremented
+5. Activity event is logged
+6. Affected peers receive updates
+
+## Rule String Format
+
+NetBird supports a convenient string format for specifying rules:
+
+```go
+// From policy.go:ParseRuleString
+func ParseRuleString(rule string) (PolicyRuleProtocolType, RulePortRange, error)
+```
+
+Format: `protocol/port` or `protocol/port-range`
+
+Examples:
+- `"tcp/443"` → TCP port 443
+- `"udp/53"` → UDP port 53
+- `"tcp/8000-8999"` → TCP ports 8000-8999
+- `"all"` → All protocols
+- `"icmp"` → ICMP only
+
+## Activity Logging
+
+All policy operations are logged:
+
+- `PolicyAdded`: New policy created
+- `PolicyUpdated`: Policy modified
+- `PolicyRemoved`: Policy deleted
+
+Event metadata includes:
+```go
+meta := map[string]any{"name": policy.Name}
+```
+
+## API Reference
+
+Key policy management functions:
+
+```go
+// Get a specific policy
+GetPolicy(ctx, accountID, policyID, userID) (*Policy, error)
+
+// List all policies
+ListPolicies(ctx, accountID, userID) ([]*Policy, error)
+
+// Create or update policy
+SavePolicy(ctx, accountID, userID, policy, create) (*Policy, error)
+
+// Delete a policy
+DeletePolicy(ctx, accountID, policyID, userID) error
+```
+
+## Related Resources
+
+- [Access Control](/network/access-control) - Overview of NetBird's security model
+- [Groups](/network/groups) - Organize peers for policies
+- [Routes](/network/routes) - Network routing configuration
+- [DNS](/network/dns) - Private DNS settings

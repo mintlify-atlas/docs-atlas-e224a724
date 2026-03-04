@@ -1,0 +1,416 @@
+---
+title: netbird status
+description: Display NetBird connection status and peer information
+---
+
+## Overview
+
+The `netbird status` command displays the current status of the NetBird client, including connection status, peer information, network details, and more.
+
+```bash
+netbird status [flags]
+```
+
+## Description
+
+This command shows:
+
+- Daemon connection status
+- Management server connection
+- Signal server connection
+- Local peer information (IP, public key, hostname)
+- Connected peers and their status
+- Network routes
+- DNS configuration
+- Active profile name
+
+## Flags
+
+### Output Formats
+
+<ParamField path="--detail" type="boolean" default="false">
+  Display detailed status information in human-readable format
+  
+  Short form: `-d`
+  
+  Shows comprehensive information about all peers, routes, and connections.
+</ParamField>
+
+<ParamField path="--json" type="boolean" default="false">
+  Display detailed status information in JSON format
+  
+  Useful for scripting and programmatic access.
+</ParamField>
+
+<ParamField path="--yaml" type="boolean" default="false">
+  Display detailed status information in YAML format
+  
+  Alternative structured format for parsing.
+</ParamField>
+
+<ParamField path="--ipv4" type="boolean" default="false">
+  Display only the NetBird IPv4 address of this peer
+  
+  Example output: `100.64.0.33`
+</ParamField>
+
+<Note>
+  The flags `--detail`, `--json`, `--yaml`, and `--ipv4` are mutually exclusive.
+</Note>
+
+### Filtering Options
+
+<ParamField path="--filter-by-ips" type="string[]">
+  Filter the detailed output by a list of one or more IP addresses
+  
+  Examples:
+  - Single IP: `--filter-by-ips 100.64.0.100`
+  - Multiple IPs: `--filter-by-ips 100.64.0.100,100.64.0.200`
+</ParamField>
+
+<ParamField path="--filter-by-names" type="string[]">
+  Filter the detailed output by peer FQDN or hostnames
+  
+  Examples:
+  - Single name: `--filter-by-names peer-a`
+  - Multiple names: `--filter-by-names peer-a,peer-b.netbird.cloud`
+</ParamField>
+
+<ParamField path="--filter-by-status" type="string">
+  Filter the detailed output by connection status
+  
+  Valid values: `idle`, `connecting`, `connected`
+  
+  Example: `--filter-by-status connected`
+</ParamField>
+
+<ParamField path="--filter-by-connection-type" type="string">
+  Filter the detailed output by connection type
+  
+  Valid values: `P2P`, `Relayed`
+  
+  Example: `--filter-by-connection-type P2P`
+</ParamField>
+
+<Info>
+  When any filter is applied, the `--detail` flag is automatically enabled.
+</Info>
+
+## Examples
+
+### Basic Status
+
+Show basic connection status:
+
+```bash
+netbird status
+```
+
+Output:
+```
+Daemon status: Connected
+Management: Connected to https://api.netbird.io:443
+Signal: Connected to https://signal.netbird.io:443
+NetBird IP: 100.64.0.10/16
+Interface: wt0
+Peers count: 5/10 Connected
+```
+
+### Detailed Status
+
+Show detailed information about all peers and connections:
+
+```bash
+netbird status --detail
+```
+
+Output:
+```
+Daemon status: Connected
+Management: Connected to https://api.netbird.io:443
+Signal: Connected to https://signal.netbird.io:443
+
+Local Peer:
+  NetBird IP: 100.64.0.10/16
+  Public Key: 7Ou4bKKmTQQMD4TpEI2RWcSbnvb0skrJUWrvZpT+pVs=
+  Hostname: my-laptop
+  Interface: wt0
+  Version: 0.31.0
+
+Peers:
+  - Hostname: server-01.netbird.cloud
+    NetBird IP: 100.64.0.20
+    Status: Connected
+    Connection type: P2P
+    Direct: true
+    Latency: 15ms
+    Last seen: 2 seconds ago
+
+  - Hostname: server-02.netbird.cloud
+    NetBird IP: 100.64.0.30
+    Status: Connected
+    Connection type: Relayed
+    Relay: relay.netbird.io
+    Latency: 45ms
+    Last seen: 5 seconds ago
+
+Networks:
+  - ID: route-abc123
+    Network: 10.0.0.0/24
+    Status: Selected
+```
+
+### JSON Output
+
+Get status in JSON format for scripting:
+
+```bash
+netbird status --json
+```
+
+Output:
+```json
+{
+  "status": "Connected",
+  "managementState": "Connected",
+  "signalState": "Connected",
+  "localPeerState": {
+    "IP": "100.64.0.10/16",
+    "pubKey": "7Ou4bKKmTQQMD4TpEI2RWcSbnvb0skrJUWrvZpT+pVs=",
+    "fqdn": "my-laptop.netbird.cloud",
+    "routes": []
+  },
+  "peers": [
+    {
+      "fqdn": "server-01.netbird.cloud",
+      "netbirdIp": "100.64.0.20",
+      "connectionStatus": "Connected",
+      "connType": "P2P",
+      "direct": true,
+      "latency": "15ms",
+      "lastSeen": "2024-01-15T10:30:45Z"
+    }
+  ],
+  "daemonVersion": "0.31.0"
+}
+```
+
+### Get Only IP Address
+
+Extract just the NetBird IP (useful in scripts):
+
+```bash
+netbird status --ipv4
+```
+
+Output:
+```
+100.64.0.10
+```
+
+Use in scripts:
+```bash
+NB_IP=$(netbird status --ipv4)
+echo "My NetBird IP is: $NB_IP"
+```
+
+### Filter by Connection Status
+
+Show only connected peers:
+
+```bash
+netbird status --filter-by-status connected
+```
+
+### Filter by Peer IP
+
+Show status for specific peers:
+
+```bash
+netbird status --filter-by-ips 100.64.0.20,100.64.0.30
+```
+
+### Filter by Hostname
+
+Show status for specific peers by name:
+
+```bash
+netbird status --filter-by-names server-01,server-02.netbird.cloud
+```
+
+### Filter by Connection Type
+
+Show only P2P connections:
+
+```bash
+netbird status --filter-by-connection-type P2P
+```
+
+Show only relayed connections:
+
+```bash
+netbird status --filter-by-connection-type Relayed
+```
+
+### YAML Output
+
+Get status in YAML format:
+
+```bash
+netbird status --yaml
+```
+
+## Status Fields
+
+### Daemon Status
+
+Possible values:
+- `Connected` - Successfully connected to the NetBird network
+- `Disconnected` - Not connected to the network
+- `Connecting` - Connection in progress
+- `NeedsLogin` - Authentication required
+- `LoginFailed` - Authentication failed
+- `SessionExpired` - Authentication session expired
+
+### Connection Status
+
+For each peer:
+- `Connected` - Active connection established
+- `Connecting` - Connection attempt in progress
+- `Idle` - No active connection (on-demand not triggered)
+
+### Connection Type
+
+- `P2P` - Direct peer-to-peer connection (best performance)
+- `Relayed` - Connection via relay server (fallback when P2P fails)
+
+## Understanding the Output
+
+### Management Server
+
+Shows connection to the NetBird management server:
+- URL and port
+- Connection status
+- Protocol version
+
+### Signal Server
+
+Shows connection to the signaling server used for peer coordination:
+- URL and port
+- Connection status
+
+### Local Peer Information
+
+- **NetBird IP**: Your virtual private IP in the NetBird network (typically in 100.64.0.0/10 range)
+- **Public Key**: Your WireGuard public key
+- **Hostname**: Your device hostname as registered with NetBird
+- **Interface**: WireGuard interface name (e.g., `wt0`)
+- **Version**: NetBird client version
+
+### Peer Information
+
+For each connected peer:
+- **Hostname/FQDN**: Peer's fully qualified domain name
+- **NetBird IP**: Peer's NetBird virtual IP
+- **Status**: Connection status
+- **Connection type**: P2P or Relayed
+- **Direct**: Whether the connection is direct or via relay
+- **Latency**: Round-trip time to the peer
+- **Last seen**: Last time peer was active
+- **Bytes sent/received**: Data transfer statistics
+
+### Network Routes
+
+- **ID**: Route identifier
+- **Network/Domains**: Network range or domain name
+- **Status**: Selected or Not Selected
+- **Resolved IPs**: For domain routes, the resolved IP addresses
+
+## Scripting Examples
+
+### Check if Connected
+
+```bash
+#!/bin/bash
+if netbird status | grep -q "Daemon status: Connected"; then
+    echo "NetBird is connected"
+    exit 0
+else
+    echo "NetBird is not connected"
+    exit 1
+fi
+```
+
+### Get Peer Count
+
+```bash
+#!/bin/bash
+netbird status --json | jq '.peers | length'
+```
+
+### List All Connected Peer IPs
+
+```bash
+#!/bin/bash
+netbird status --json | jq -r '.peers[] | select(.connectionStatus=="Connected") | .netbirdIp'
+```
+
+### Check Connection Type
+
+```bash
+#!/bin/bash
+P2P_COUNT=$(netbird status --json | jq '[.peers[] | select(.connType=="P2P")] | length')
+RELAYED_COUNT=$(netbird status --json | jq '[.peers[] | select(.connType=="Relayed")] | length')
+
+echo "P2P connections: $P2P_COUNT"
+echo "Relayed connections: $RELAYED_COUNT"
+```
+
+### Monitor Connection Health
+
+```bash
+#!/bin/bash
+while true; do
+    clear
+    netbird status --detail --filter-by-status connected
+    sleep 5
+done
+```
+
+## Common Status Messages
+
+### NeedsLogin
+
+```
+Daemon status: NeedsLogin
+
+Run UP command to log in with SSO (interactive login):
+ netbird up
+
+If you are running a self-hosted version and no SSO provider has been configured,
+you can use a setup-key:
+ netbird up --management-url <YOUR_MANAGEMENT_URL> --setup-key <YOUR_SETUP_KEY>
+```
+
+**Solution:** Run `netbird up` or `netbird login`
+
+### Daemon Not Running
+
+```
+failed to connect to daemon error: connection refused
+If the daemon is not running please run:
+netbird service install
+netbird service start
+```
+
+**Solution:**
+```bash
+netbird service install
+netbird service start
+```
+
+## See Also
+
+- [netbird up](/cli/up) - Connect to the network
+- [netbird down](/cli/down) - Disconnect from the network
+- [netbird networks list](/cli/routes) - List available network routes

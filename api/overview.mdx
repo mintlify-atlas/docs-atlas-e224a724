@@ -1,0 +1,131 @@
+---
+title: API Overview
+description: Introduction to the NetBird REST API
+---
+
+The NetBird REST API allows you to programmatically manage your NetBird network, including peers, users, groups, policies, routes, and DNS settings.
+
+## Base URL
+
+The default API base URL is:
+
+```
+https://api.netbird.io
+```
+
+For self-hosted instances, use your management server URL:
+
+```
+https://your-netbird-instance.com/api
+```
+
+## API Versioning
+
+The current API version is `0.0.1`. The version may change as new features are added and the API evolves.
+
+## Authentication
+
+All API requests require authentication using either:
+
+1. **Bearer Token (JWT)** - Obtained through OAuth2 authentication flow
+2. **Personal Access Token** - Created via the dashboard or API
+
+See the [Authentication](/api/authentication) page for detailed information on authenticating with the API.
+
+## Request Format
+
+All requests should:
+- Use HTTPS
+- Set the `Content-Type` header to `application/json` for requests with a body
+- Include authentication credentials in the `Authorization` header
+
+## Response Format
+
+All responses are returned in JSON format. Successful responses typically return:
+- `200 OK` for successful GET, PUT, DELETE requests
+- `201 Created` for successful POST requests creating new resources
+
+Error responses include:
+- `400 Bad Request` - Invalid request parameters
+- `401 Unauthorized` - Missing or invalid authentication
+- `403 Forbidden` - Insufficient permissions
+- `404 Not Found` - Resource not found
+- `500 Internal Server Error` - Server error
+
+## Rate Limiting
+
+API rate limits depend on your subscription plan. When rate limited, you'll receive a `429 Too Many Requests` response.
+
+<Note>
+For NetBird Cloud users, rate limits are applied per account. Self-hosted instances may have different rate limiting configurations.
+</Note>
+
+## Pagination
+
+Some endpoints support pagination for large result sets. Pagination parameters include:
+
+<ParamField query="page" type="integer" default="1">
+  Page number (1-indexed)
+</ParamField>
+
+<ParamField query="page_size" type="integer" default="50">
+  Number of items per page
+</ParamField>
+
+Paginated responses include metadata:
+
+```json
+{
+  "data": [...],
+  "page": 1,
+  "page_size": 50,
+  "total_records": 523,
+  "total_pages": 11
+}
+```
+
+## OpenAPI Specification
+
+The complete OpenAPI specification is available in the NetBird repository:
+
+```
+https://github.com/netbirdio/netbird/blob/main/shared/management/http/api/openapi.yml
+```
+
+## API Resources
+
+Explore the available API resources:
+
+<CardGroup cols={2}>
+  <Card title="Users" icon="users" href="/api/users">
+    Manage users and service accounts
+  </Card>
+  <Card title="Peers" icon="laptop" href="/api/peers">
+    Manage network peers and devices
+  </Card>
+  <Card title="Groups" icon="layer-group" href="/api/groups">
+    Organize peers and users into groups
+  </Card>
+  <Card title="Policies" icon="shield" href="/api/policies">
+    Configure access control policies
+  </Card>
+  <Card title="Routes" icon="route" href="/api/routes">
+    Manage network routes and exit nodes
+  </Card>
+  <Card title="DNS" icon="network-wired" href="/api/dns">
+    Configure DNS settings and nameservers
+  </Card>
+  <Card title="Setup Keys" icon="key" href="/api/setup-keys">
+    Generate keys for peer enrollment
+  </Card>
+  <Card title="Events" icon="clock-rotate-left" href="/api/events">
+    View audit logs and activity events
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+If you need assistance:
+- Join our [Slack community](https://netbird.io/slack)
+- Check the [GitHub discussions](https://github.com/netbirdio/netbird/discussions)
+- Report issues on [GitHub](https://github.com/netbirdio/netbird/issues)

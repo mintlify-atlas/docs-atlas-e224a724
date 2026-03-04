@@ -1,0 +1,437 @@
+---
+title: Windows Client
+description: Install and configure NetBird on Windows
+---
+
+The NetBird client for Windows provides a native system tray application with full mesh networking capabilities.
+
+## Installation
+
+### Download the MSI Installer
+
+Download the latest NetBird installer from [netbird.io/install](https://netbird.io/install) or [GitHub Releases](https://github.com/netbirdio/netbird/releases).
+
+<Steps>
+  <Step title="Run the installer">
+    Double-click the downloaded `.msi` file to launch the installer.
+  </Step>
+
+  <Step title="Follow the installation wizard">
+    - Accept the license agreement
+    - Choose the installation location (default: `C:\Program Files\Netbird`)
+    - Click **Install**
+  </Step>
+
+  <Step title="Complete installation">
+    The installer will:
+    - Install the NetBird CLI and UI
+    - Install the Windows service
+    - Add NetBird to your system tray
+    - Start the service automatically
+  </Step>
+</Steps>
+
+## Initial Setup
+
+After installation, you can connect to NetBird using either the system tray app or the command line.
+
+### Using the System Tray App
+
+<Steps>
+  <Step title="Locate the NetBird icon">
+    Look for the NetBird icon in your Windows system tray (bottom-right corner of the screen).
+  </Step>
+
+  <Step title="Connect to your network">
+    - Right-click the NetBird icon
+    - Click **Connect**
+    - Sign in with your SSO provider or use a setup key
+  </Step>
+
+  <Step title="Verify connection">
+    The system tray icon will show a connected state. Click it to view:
+    - Your NetBird IP address
+    - Connected peers
+    - Network statistics
+  </Step>
+</Steps>
+
+### Using the Command Line
+
+Open **PowerShell** or **Command Prompt** as Administrator:
+
+<Steps>
+  <Step title="Start the NetBird service">
+    ```powershell
+    netbird service install
+    netbird service start
+    ```
+
+    <Note>
+      The service is usually started automatically during installation.
+    </Note>
+  </Step>
+
+  <Step title="Connect to NetBird">
+    **Using SSO (Interactive Login):**
+    ```powershell
+    netbird up
+    ```
+
+    **Using a Setup Key:**
+    ```powershell
+    netbird up --setup-key <YOUR_SETUP_KEY>
+    ```
+
+    **For self-hosted installations:**
+    ```powershell
+    netbird up --management-url https://your-management-url.com --setup-key <YOUR_SETUP_KEY>
+    ```
+  </Step>
+
+  <Step title="Check status">
+    ```powershell
+    netbird status
+    ```
+
+    Expected output:
+    ```
+    Daemon status: Connected
+    Management: Connected
+    Signal: Connected
+    NetBird IP: 100.x.x.x/16
+    ```
+  </Step>
+</Steps>
+
+## Service Management
+
+Manage the NetBird Windows service:
+
+```powershell
+# Check service status
+netbird service status
+
+# Start the service
+netbird service start
+
+# Stop the service
+netbird service stop
+
+# Restart the service
+netbird service restart
+
+# Uninstall the service
+netbird service uninstall
+```
+
+Alternatively, use Windows Services Manager:
+
+1. Press `Win + R`
+2. Type `services.msc` and press Enter
+3. Find **Netbird** in the list
+4. Right-click to Start, Stop, or Restart
+
+## Configuration
+
+### Config File Location
+
+The NetBird configuration is stored at:
+```
+%PROGRAMDATA%\Netbird\config.json
+```
+
+Typically: `C:\ProgramData\Netbird\config.json`
+
+### Log Files
+
+Logs are written to:
+```
+%PROGRAMDATA%\Netbird\client.log
+```
+
+Typically: `C:\ProgramData\Netbird\client.log`
+
+View logs in PowerShell:
+```powershell
+Get-Content "$env:PROGRAMDATA\Netbird\client.log" -Tail 50 -Wait
+```
+
+### Environment Variables
+
+Configure NetBird using environment variables with the `NB_` prefix:
+
+| Variable | Description | Example |
+|----------|-------------|--------|
+| `NB_MANAGEMENT_URL` | Management server URL | `https://api.netbird.io` |
+| `NB_LOG_LEVEL` | Logging level | `info`, `debug`, `error` |
+| `NB_LOG_FILE` | Log file path | `C:\ProgramData\Netbird\client.log` |
+| `NB_INTERFACE_NAME` | WireGuard interface name | `wt0` |
+| `NB_WIREGUARD_PORT` | WireGuard listening port | `51820` |
+| `NB_CONFIG` | Config file path | `C:\ProgramData\Netbird\config.json` |
+| `NB_DAEMON_ADDR` | Daemon socket address | `tcp://127.0.0.1:41731` |
+
+Set service environment variables:
+```powershell
+netbird service install --service-env="NB_LOG_LEVEL=debug,NB_WIREGUARD_PORT=51820"
+```
+
+<Note>
+  On Windows, the daemon listens on TCP `127.0.0.1:41731` by default (not Unix socket).
+</Note>
+
+### Command-Line Options
+
+Key CLI flags for `netbird up`:
+
+```powershell
+# Set custom WireGuard interface name
+netbird up --interface-name wt0
+
+# Set custom WireGuard port
+netbird up --wireguard-port 51820
+
+# Set custom MTU
+netbird up --mtu 1280
+
+# Set custom hostname
+netbird up --hostname my-windows-pc
+
+# Disable auto-connect on service start
+netbird up --disable-auto-connect
+
+# Set custom DNS resolver address
+netbird up --dns-resolver-address 127.0.0.1:5053
+
+# Add extra DNS labels
+netbird up --extra-dns-labels vpc1,prod
+```
+
+## Windows-Specific Features
+
+### Network Monitor
+
+NetBird on Windows has network monitoring **enabled by default** to handle network changes (Wi-Fi switching, VPN connections, etc.).
+
+To disable:
+```powershell
+netbird up --network-monitor=false
+```
+
+### Windows Firewall
+
+NetBird automatically configures Windows Firewall rules. If you experience connection issues, verify:
+
+```powershell
+# Check if NetBird is allowed through firewall
+Get-NetFirewallRule -DisplayName "*NetBird*"
+```
+
+### Run as Administrator
+
+Some NetBird operations require administrator privileges. Always run PowerShell or Command Prompt as Administrator when:
+- Installing or uninstalling the service
+- Modifying network settings
+- Troubleshooting connectivity issues
+
+## Advanced Configuration
+
+### Running in Foreground Mode
+
+For debugging or testing:
+
+```powershell
+netbird up --foreground-mode
+```
+
+### Custom External IP Mapping
+
+For machines behind NAT or with multiple interfaces:
+
+```powershell
+# Map external IP to local IP
+netbird up --external-ip-map 203.0.113.5/192.168.1.10
+
+# Map external IP to interface
+netbird up --external-ip-map 203.0.113.5/Ethernet
+
+# Multiple mappings
+netbird up --external-ip-map 203.0.113.5,203.0.113.6/192.168.1.10
+```
+
+### Disable Auto-Connect
+
+Prevent NetBird from connecting automatically when the service starts:
+
+```powershell
+netbird up --disable-auto-connect
+```
+
+### Service Reconfiguration
+
+Update service settings without reinstalling:
+
+```powershell
+netbird service reconfigure --service-env="NB_LOG_LEVEL=debug,NB_WIREGUARD_PORT=51820"
+```
+
+## Troubleshooting
+
+### Check Connection Status
+
+```powershell
+# Basic status
+netbird status
+
+# Detailed status with peer information
+netbird status --detail
+
+# JSON output for parsing
+netbird status --json
+
+# Get only your NetBird IP
+netbird status --ipv4
+```
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="System tray app not responding">
+    Restart the service:
+    ```powershell
+    netbird service restart
+    ```
+
+    If the problem persists:
+    ```powershell
+    netbird service stop
+    netbird service uninstall
+    netbird service install
+    netbird service start
+    ```
+  </Accordion>
+
+  <Accordion title="Service won't start">
+    Check if the service is installed:
+    ```powershell
+    Get-Service -Name "Netbird"
+    ```
+
+    View detailed service status:
+    ```powershell
+    netbird service status
+    ```
+
+    Check Windows Event Viewer:
+    1. Press `Win + X`
+    2. Select **Event Viewer**
+    3. Navigate to **Windows Logs → Application**
+    4. Look for NetBird-related errors
+  </Accordion>
+
+  <Accordion title="Connection timeout">
+    Ensure Windows Firewall allows NetBird:
+    ```powershell
+    # Check firewall rules
+    Get-NetFirewallRule -DisplayName "*NetBird*" | Format-Table Name,Enabled,Direction,Action
+    ```
+
+    Enable debug logging:
+    ```powershell
+    netbird service stop
+    netbird service install --service-env="NB_LOG_LEVEL=debug"
+    netbird service start
+    
+    Get-Content "$env:PROGRAMDATA\Netbird\client.log" -Tail 50 -Wait
+    ```
+  </Accordion>
+
+  <Accordion title="WireGuard interface errors">
+    Check if WireGuard driver is installed:
+    ```powershell
+    Get-NetAdapter | Where-Object {$_.InterfaceDescription -like "*WireGuard*"}
+    ```
+
+    Reinstall NetBird if the driver is missing.
+  </Accordion>
+
+  <Accordion title="Permission denied errors">
+    Always run PowerShell or Command Prompt **as Administrator** for NetBird operations.
+
+    Right-click PowerShell → **Run as administrator**
+  </Accordion>
+</AccordionGroup>
+
+### Debug Bundle
+
+Generate a debug bundle for troubleshooting:
+
+```powershell
+netbird debug bundle
+```
+
+This creates a ZIP file with:
+- Configuration files
+- Log files
+- System information
+- Network diagnostics
+
+## Updating NetBird
+
+### Automatic Updates
+
+NetBird for Windows can check for updates automatically. You'll be notified in the system tray when a new version is available.
+
+### Manual Update
+
+1. Download the latest MSI installer
+2. Run the installer (it will detect and upgrade the existing installation)
+3. Restart the service if needed:
+   ```powershell
+   netbird service restart
+   ```
+
+## Uninstalling
+
+<Steps>
+  <Step title="Stop and uninstall the service">
+    ```powershell
+    netbird service stop
+    netbird service uninstall
+    ```
+  </Step>
+
+  <Step title="Uninstall via Control Panel">
+    1. Press `Win + R`
+    2. Type `appwiz.cpl` and press Enter
+    3. Find **NetBird** in the list
+    4. Click **Uninstall**
+  </Step>
+
+  <Step title="Remove configuration files (optional)">
+    ```powershell
+    Remove-Item -Recurse -Force "$env:PROGRAMDATA\Netbird"
+    ```
+  </Step>
+</Steps>
+
+### Alternative: Uninstall via MSI
+
+Run the MSI installer again and select **Remove** when prompted.
+
+### Clean Uninstall
+
+For a complete removal:
+
+```powershell
+# Stop and uninstall service
+netbird service stop
+netbird service uninstall
+
+# Uninstall via Windows Installer
+msiexec /x {PRODUCT_CODE} /qn
+
+# Remove all NetBird files
+Remove-Item -Recurse -Force "$env:PROGRAMFILES\Netbird"
+Remove-Item -Recurse -Force "$env:PROGRAMDATA\Netbird"
+```

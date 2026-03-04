@@ -1,0 +1,409 @@
+---
+title: Quantum Resistance
+description: Enable post-quantum cryptography with Rosenpass integration
+---
+
+NetBird implements quantum-resistant encryption through [Rosenpass](https://rosenpass.eu), providing protection against future quantum computer attacks. This feature adds post-quantum key exchange on top of WireGuard's existing encryption.
+
+## What is Rosenpass?
+
+Rosenpass is a formally verified, post-quantum secure key exchange protocol designed to complement WireGuard. It provides additional key material that is resistant to attacks from quantum computers, even hypothetical future ones.
+
+<Info>
+Rosenpass uses the **Classic McEliece** cryptosystem, a code-based post-quantum algorithm that's a finalist in NIST's post-quantum cryptography standardization project.
+</Info>
+
+## Why Quantum Resistance Matters
+
+### Harvest Now, Decrypt Later Attacks
+
+Adversaries can capture encrypted traffic today and store it, waiting for quantum computers powerful enough to decrypt it in the future. This is particularly concerning for:
+
+- Long-lived sensitive data
+- Regulatory compliance requirements (GDPR, HIPAA)
+- National security information
+- Intellectual property
+- Financial records
+
+### Post-Quantum Cryptography
+
+Quantum computers threaten current public-key cryptography:
+
+- **Traditional RSA/ECC**: Vulnerable to quantum attacks (Shor's algorithm)
+- **WireGuard alone**: Uses Curve25519, susceptible to quantum cryptanalysis
+- **Rosenpass + WireGuard**: Adds quantum-resistant key exchange layer
+
+## How Rosenpass Works with NetBird
+
+Rosenpass integrates with WireGuard to provide defense-in-depth:
+
+<Steps>
+  <Step title="Initial Key Exchange">
+    Rosenpass performs a post-quantum key exchange between peers using Classic McEliece.
+  </Step>
+  
+  <Step title="Key Material Mixing">
+    The quantum-resistant key material is mixed with WireGuard's traditional keys.
+  </Step>
+  
+  <Step title="Periodic Key Rotation">
+    Rosenpass continuously exchanges new key material every 2 minutes, providing forward secrecy.
+  </Step>
+  
+  <Step title="Encryption">
+    WireGuard encrypts traffic using the combined key material, protecting against both classical and quantum attacks.
+  </Step>
+</Steps>
+
+<Info>
+Even if WireGuard's Curve25519 is broken by quantum computers, the Rosenpass-derived keys keep the connection secure.
+</Info>
+
+## Enabling Rosenpass
+
+### NetBird Client Configuration
+
+Enable Rosenpass when starting the NetBird client:
+
+<Tabs>
+  <Tab title="Command Line">
+    ```bash
+    # Enable Rosenpass for quantum resistance
+    netbird up --enable-rosenpass
+    ```
+    
+    This flag activates Rosenpass for all peer connections where both sides support it.
+  </Tab>
+  
+  <Tab title="Environment Variable">
+    ```bash
+    # Set environment variable
+    export NB_ENABLE_ROSENPASS=true
+    netbird up
+    ```
+    
+    Or with the legacy prefix:
+    ```bash
+    export WT_ENABLE_ROSENPASS=true
+    netbird up
+    ```
+  </Tab>
+  
+  <Tab title="Configuration File">
+    Add to your NetBird configuration file:
+    
+    ```json
+    {
+      "EnableRosenpass": true
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Permissive Mode
+
+Rosenpass permissive mode allows your peer to accept connections from peers that don't have Rosenpass enabled:
+
+```bash
+netbird up --enable-rosenpass --rosenpass-permissive
+```
+
+<Warning>
+**Permissive mode behavior:**
+- Enables Rosenpass for peers that support it
+- Allows fallback to WireGuard-only for peers without Rosenpass
+- Useful during migration periods
+- Less secure than requiring Rosenpass on all connections
+</Warning>
+
+### Checking Rosenpass Status
+
+Verify Rosenpass is active:
+
+```bash
+# Check peer connections
+netbird status
+
+# Look for Rosenpass indicators in peer status
+netbird status --detail
+```
+
+## Deployment Strategies
+
+### Phased Rollout
+
+Roll out Rosenpass gradually to minimize disruption:
+
+<Steps>
+  <Step title="Test Environment">
+    Enable Rosenpass in a test environment with a few peers.
+    
+    ```bash
+    netbird up --enable-rosenpass --rosenpass-permissive
+    ```
+  </Step>
+  
+  <Step title="Pilot Group">
+    Deploy to a pilot group using permissive mode.
+    
+    Monitor for compatibility issues and performance impact.
+  </Step>
+  
+  <Step title="Organization-Wide">
+    Roll out to all peers once pilot is successful.
+    
+    Keep permissive mode enabled during transition.
+  </Step>
+  
+  <Step title="Enforce Rosenpass">
+    After all peers are upgraded, disable permissive mode.
+    
+    ```bash
+    netbird up --enable-rosenpass
+    ```
+  </Step>
+</Steps>
+
+### Network-Wide Configuration
+
+For managed deployments, distribute configuration via:
+
+<CardGroup cols={2}>
+  <Card title="Configuration Management" icon="gears">
+    Use Ansible, Puppet, or Chef to deploy Rosenpass-enabled configurations.
+  </Card>
+  <Card title="Group Policy" icon="users">
+    Deploy Windows configurations via Group Policy Objects (GPO).
+  </Card>
+  <Card title="Mobile Device Management" icon="mobile">
+    Push configurations to mobile devices via MDM solutions.
+  </Card>
+  <Card title="Container Orchestration" icon="docker">
+    Configure Rosenpass in container environment variables or config maps.
+  </Card>
+</CardGroup>
+
+## Performance Considerations
+
+### Computational Overhead
+
+Rosenpass adds minimal overhead:
+
+- **Key exchange**: Initial handshake takes slightly longer
+- **Ongoing overhead**: Negligible impact on throughput
+- **CPU usage**: Minimal increase for key rotation every 2 minutes
+- **Memory**: Small additional memory footprint for Rosenpass daemon
+
+### Network Impact
+
+Rosenpass protocol characteristics:
+
+| Metric | Impact |
+|--------|--------|
+| Handshake size | Larger than WireGuard-only (~1.3MB initial exchange) |
+| Key rotation | Every 2 minutes (small periodic packets) |
+| Bandwidth | Less than 1% increase for typical workloads |
+| Latency | No measurable impact on established connections |
+
+<Info>
+The larger initial handshake is due to Classic McEliece's post-quantum security properties. After the initial exchange, performance is nearly identical to WireGuard-only.
+</Info>
+
+## Platform Support
+
+Rosenpass availability by platform:
+
+| Platform | Support | Notes |
+|----------|---------|-------|
+| Linux | ✅ Full | Native support |
+| macOS | ✅ Full | Supported on all versions |
+| Windows | ✅ Full | Windows 10/11 |
+| Android | ✅ Full | Mobile support |
+| iOS | ✅ Full | Mobile support |
+| OpenWRT | ✅ Full | Router/embedded support |
+| Docker | ✅ Full | Container deployments |
+| Serverless | ✅ Full | FaaS environments |
+
+## Security Properties
+
+### Cryptographic Guarantees
+
+Rosenpass provides:
+
+- **Post-quantum security**: Resistant to Grover's and Shor's quantum algorithms
+- **Forward secrecy**: Periodic key rotation every 2 minutes
+- **Defense in depth**: Complements WireGuard's encryption
+- **Formal verification**: Mathematically proven security properties
+
+### Threat Model
+
+Rosenpass protects against:
+
+<AccordionGroup>
+  <Accordion title="Quantum Computer Attacks">
+    Even if a sufficiently powerful quantum computer breaks Curve25519:
+    - Rosenpass keys remain secure
+    - Traffic stays encrypted
+    - No retroactive decryption possible
+  </Accordion>
+  
+  <Accordion title="Harvest Now, Decrypt Later">
+    Adversaries capturing encrypted traffic today cannot:
+    - Decrypt it when quantum computers arrive
+    - Recover historical key material
+    - Break forward secrecy guarantees
+  </Accordion>
+  
+  <Accordion title="Classical Attacks">
+    Rosenpass doesn't weaken existing security:
+    - WireGuard's classical security remains intact
+    - No reduction in current threat protection
+    - Additional layer, not a replacement
+  </Accordion>
+</AccordionGroup>
+
+### What Rosenpass Doesn't Protect
+
+<Warning>
+Rosenpass does not protect against:
+- Compromised endpoints (malware, keyloggers)
+- Social engineering attacks
+- Weak passwords or authentication
+- Physical access to devices
+- Zero-day vulnerabilities in the OS or NetBird client
+
+Use in combination with other security measures (MFA, posture checks, access policies).
+</Warning>
+
+## Compliance and Standards
+
+### Regulatory Considerations
+
+Post-quantum cryptography is becoming a compliance requirement:
+
+- **NIST**: Standardizing post-quantum algorithms
+- **NSA**: Recommends planning for quantum-resistant cryptography
+- **EU**: Quantum-safe cryptography in digital security strategies
+- **Financial sector**: Moving towards quantum-resistant solutions
+
+### Algorithm Selection
+
+Why Classic McEliece:
+
+<Steps>
+  <Step title="NIST Finalist">
+    Classic McEliece is a finalist in NIST's PQC standardization.
+  </Step>
+  
+  <Step title="Proven Security">
+    Code-based cryptography has decades of cryptanalysis without breaks.
+  </Step>
+  
+  <Step title="Conservative Choice">
+    Relies on well-understood mathematical problems.
+  </Step>
+  
+  <Step title="Long-term Confidence">
+    Likely to remain secure even as quantum computing advances.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Rosenpass Handshake Failures">
+    **Symptoms:**
+    - Peers fail to establish quantum-resistant connection
+    - Falling back to WireGuard-only in permissive mode
+    
+    **Solutions:**
+    1. Verify both peers have Rosenpass enabled
+    2. Check firewall rules allow Rosenpass packets
+    3. Ensure peers are running compatible NetBird versions
+    4. Review logs for specific error messages
+    
+    ```bash
+    # Check logs for Rosenpass errors
+    netbird debug log
+    ```
+  </Accordion>
+  
+  <Accordion title="Performance Issues">
+    **If experiencing slowdowns:**
+    1. Measure baseline performance without Rosenpass
+    2. Check CPU usage during key rotation
+    3. Verify network bandwidth isn't saturated
+    4. Rule out other factors (firewall, NAT, routing)
+    
+    <Info>
+    Rosenpass should not cause noticeable performance degradation. If you see significant impact, investigate other potential causes.
+    </Info>
+  </Accordion>
+  
+  <Accordion title="Compatibility Problems">
+    **Mixed version environments:**
+    - Older NetBird versions may not support Rosenpass
+    - Use permissive mode during upgrade period
+    - Plan coordinated upgrades for best results
+    
+    **Platform-specific:**
+    - Ensure all platforms in your deployment support Rosenpass
+    - Test in staging environment first
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Enable by Default">
+    Make Rosenpass the default for all new deployments.
+  </Step>
+  
+  <Step title="Document Rollout">
+    Keep records of which peers have Rosenpass enabled.
+  </Step>
+  
+  <Step title="Monitor Adoption">
+    Track Rosenpass adoption rate across your network.
+  </Step>
+  
+  <Step title="Plan for Post-Quantum Future">
+    Stay informed about NIST PQC standardization progress.
+  </Step>
+  
+  <Step title="Test Regularly">
+    Verify Rosenpass continues working after client updates.
+  </Step>
+  
+  <Step title="Combine with Other Security">
+    Use alongside MFA, posture checks, and access policies.
+  </Step>
+</Steps>
+
+## Learn More
+
+<CardGroup cols={2}>
+  <Card title="Rosenpass Project" icon="link" href="https://rosenpass.eu">
+    Official Rosenpass documentation and research papers
+  </Card>
+  <Card title="NetBird Blog" icon="newspaper" href="https://netbird.io/knowledge-hub/the-first-quantum-resistant-mesh-vpn">
+    NetBird's quantum resistance announcement
+  </Card>
+  <Card title="NIST PQC" icon="shield" href="https://csrc.nist.gov/projects/post-quantum-cryptography">
+    NIST Post-Quantum Cryptography project
+  </Card>
+  <Card title="Classic McEliece" icon="book" href="https://classic.mceliece.org">
+    Classic McEliece algorithm details
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="SSO Setup" icon="right-to-bracket" href="/security/sso-setup">
+    Configure identity provider integration
+  </Card>
+  <Card title="Network Access" icon="network-wired" href="/network/access-control">
+    Set up access control policies
+  </Card>
+</CardGroup>

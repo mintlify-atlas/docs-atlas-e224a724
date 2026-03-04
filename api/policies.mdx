@@ -1,0 +1,436 @@
+---
+title: Policies API
+description: Configure access control policies and network rules
+---
+
+Policies control network access between groups of peers by defining rules that specify which peers can communicate, on which protocols and ports.
+
+## List All Policies
+
+Returns a list of all access control policies.
+
+```bash
+GET /api/policies
+```
+
+<CodeGroup>
+```bash Request
+curl -X GET https://api.netbird.io/api/policies \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```json Response
+[
+  {
+    "id": "ch8i4ug6lnn4g9hqv7mg",
+    "name": "Allow Engineering to Production",
+    "description": "Allows engineering team access to production servers",
+    "enabled": true,
+    "source_posture_checks": ["chacdk86lnnboviihd70"],
+    "rules": [
+      {
+        "id": "ch8i4ug6lnn4g9hqv7mh",
+        "name": "HTTPS Access",
+        "description": "Allow HTTPS traffic",
+        "enabled": true,
+        "action": "accept",
+        "bidirectional": false,
+        "protocol": "tcp",
+        "ports": ["443"],
+        "sources": [
+          {
+            "id": "ch8i4ug6lnn4g9hqv797",
+            "name": "engineering",
+            "peers_count": 5
+          }
+        ],
+        "destinations": [
+          {
+            "id": "ch8i4ug6lnn4g9h7v7m0",
+            "name": "production",
+            "peers_count": 3
+          }
+        ]
+      }
+    ]
+  }
+]
+```
+</CodeGroup>
+
+<ResponseField name="id" type="string">
+  Unique policy identifier
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Policy name
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Policy description
+</ResponseField>
+
+<ResponseField name="enabled" type="boolean">
+  Whether the policy is active
+</ResponseField>
+
+<ResponseField name="source_posture_checks" type="array">
+  Posture check IDs applied to source groups
+</ResponseField>
+
+<ResponseField name="rules" type="array">
+  List of policy rules defining access controls
+</ResponseField>
+
+## Get a Policy
+
+Retrieve detailed information about a specific policy.
+
+```bash
+GET /api/policies/{policyId}
+```
+
+<ParamField path="policyId" type="string" required>
+  The unique identifier of the policy
+</ParamField>
+
+```bash Example
+curl -X GET https://api.netbird.io/api/policies/ch8i4ug6lnn4g9hqv7mg \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+## Create a Policy
+
+Create a new access control policy with rules.
+
+```bash
+POST /api/policies
+```
+
+<ParamField body="name" type="string" required>
+  Policy name
+</ParamField>
+
+<ParamField body="description" type="string">
+  Policy description
+</ParamField>
+
+<ParamField body="enabled" type="boolean" required>
+  Whether the policy is active
+</ParamField>
+
+<ParamField body="source_posture_checks" type="array">
+  Posture check IDs to apply to source groups
+</ParamField>
+
+<ParamField body="rules" type="array" required>
+  List of policy rules
+</ParamField>
+
+<CodeGroup>
+```bash Create Policy
+curl -X POST https://api.netbird.io/api/policies \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Allow SSH Access",
+    "description": "Allow admins to SSH into servers",
+    "enabled": true,
+    "source_posture_checks": [],
+    "rules": [
+      {
+        "name": "SSH Rule",
+        "description": "SSH access on port 22",
+        "enabled": true,
+        "action": "accept",
+        "bidirectional": false,
+        "protocol": "tcp",
+        "ports": ["22"],
+        "sources": ["ch8i4ug6lnn4g9hqv797"],
+        "destinations": ["ch8i4ug6lnn4g9h7v7m0"]
+      }
+    ]
+  }'
+```
+
+```json Response
+{
+  "id": "ch8i4ug6lnn4g9hqv7mi",
+  "name": "Allow SSH Access",
+  "description": "Allow admins to SSH into servers",
+  "enabled": true,
+  "source_posture_checks": [],
+  "rules": [
+    {
+      "id": "ch8i4ug6lnn4g9hqv7mj",
+      "name": "SSH Rule",
+      "enabled": true,
+      "action": "accept",
+      "protocol": "tcp",
+      "ports": ["22"],
+      "sources": [...],
+      "destinations": [...]
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Update a Policy
+
+Update an existing policy and its rules.
+
+```bash
+PUT /api/policies/{policyId}
+```
+
+<ParamField path="policyId" type="string" required>
+  The unique identifier of the policy
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Policy name
+</ParamField>
+
+<ParamField body="enabled" type="boolean" required>
+  Whether the policy is active
+</ParamField>
+
+<ParamField body="rules" type="array" required>
+  Complete list of policy rules (replaces existing rules)
+</ParamField>
+
+```bash Example
+curl -X PUT https://api.netbird.io/api/policies/ch8i4ug6lnn4g9hqv7mg \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Updated Policy Name",
+    "enabled": true,
+    "source_posture_checks": ["chacdk86lnnboviihd70"],
+    "rules": [...]
+  }'
+```
+
+## Delete a Policy
+
+Remove a policy from the network.
+
+```bash
+DELETE /api/policies/{policyId}
+```
+
+<ParamField path="policyId" type="string" required>
+  The unique identifier of the policy
+</ParamField>
+
+```bash Example
+curl -X DELETE https://api.netbird.io/api/policies/ch8i4ug6lnn4g9hqv7mg \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+## Policy Rules
+
+Each policy contains one or more rules that define access controls.
+
+### Rule Fields
+
+<ParamField body="name" type="string" required>
+  Rule name
+</ParamField>
+
+<ParamField body="description" type="string">
+  Rule description
+</ParamField>
+
+<ParamField body="enabled" type="boolean" required>
+  Whether the rule is active
+</ParamField>
+
+<ParamField body="action" type="string" required>
+  Action to take: `accept` or `drop`
+</ParamField>
+
+<ParamField body="bidirectional" type="boolean" required>
+  Whether the rule applies in both directions
+</ParamField>
+
+<ParamField body="protocol" type="string" required>
+  Protocol type: `all`, `tcp`, `udp`, `icmp`, or `netbird-ssh`
+</ParamField>
+
+<ParamField body="ports" type="array">
+  List of port numbers (for TCP/UDP)
+</ParamField>
+
+<ParamField body="port_ranges" type="array">
+  List of port range objects with `start` and `end` fields
+</ParamField>
+
+<ParamField body="sources" type="array" required>
+  Source group IDs
+</ParamField>
+
+<ParamField body="destinations" type="array" required>
+  Destination group IDs
+</ParamField>
+
+<ParamField body="sourceResource" type="object">
+  Source resource object (alternative to sources)
+</ParamField>
+
+<ParamField body="destinationResource" type="object">
+  Destination resource object (alternative to destinations)
+</ParamField>
+
+### Protocol Examples
+
+<CodeGroup>
+```json TCP Port
+{
+  "protocol": "tcp",
+  "ports": ["443", "8080"]
+}
+```
+
+```json Port Range
+{
+  "protocol": "tcp",
+  "port_ranges": [
+    {"start": 8000, "end": 8999}
+  ]
+}
+```
+
+```json All Traffic
+{
+  "protocol": "all"
+}
+```
+
+```json ICMP
+{
+  "protocol": "icmp"
+}
+```
+
+```json NetBird SSH
+{
+  "protocol": "netbird-ssh"
+}
+```
+</CodeGroup>
+
+## Policy Actions
+
+<CardGroup cols={2}>
+  <Card title="Accept" icon="check" color="#16a34a">
+    Allow traffic matching the rule
+  </Card>
+  <Card title="Drop" icon="xmark" color="#dc2626">
+    Block traffic matching the rule
+  </Card>
+</CardGroup>
+
+## Bidirectional Rules
+
+When `bidirectional: true`, the rule applies in both directions:
+
+```json
+{
+  "bidirectional": true,
+  "sources": ["group-a"],
+  "destinations": ["group-b"]
+}
+```
+
+This allows:
+- Group A → Group B
+- Group B → Group A
+
+## Posture Checks
+
+Apply security requirements to source groups:
+
+```json
+{
+  "source_posture_checks": [
+    "chacdk86lnnboviihd70"
+  ]
+}
+```
+
+Peers in source groups must pass all specified posture checks before the policy applies.
+
+## Common Policy Patterns
+
+### Allow All Within Group
+
+```json
+{
+  "name": "Internal Team Access",
+  "enabled": true,
+  "rules": [
+    {
+      "name": "All Traffic",
+      "action": "accept",
+      "bidirectional": true,
+      "protocol": "all",
+      "sources": ["team-group-id"],
+      "destinations": ["team-group-id"]
+    }
+  ]
+}
+```
+
+### Database Access
+
+```json
+{
+  "name": "Database Access",
+  "enabled": true,
+  "rules": [
+    {
+      "name": "PostgreSQL",
+      "action": "accept",
+      "bidirectional": false,
+      "protocol": "tcp",
+      "ports": ["5432"],
+      "sources": ["app-servers-group"],
+      "destinations": ["database-group"]
+    }
+  ]
+}
+```
+
+### Zero Trust Access
+
+```json
+{
+  "name": "Production Access",
+  "enabled": true,
+  "source_posture_checks": [
+    "os-version-check",
+    "antivirus-check"
+  ],
+  "rules": [
+    {
+      "name": "SSH Access",
+      "action": "accept",
+      "protocol": "tcp",
+      "ports": ["22"],
+      "sources": ["admins-group"],
+      "destinations": ["production-group"]
+    }
+  ]
+}
+```
+
+## Best Practices
+
+<Check>**Start with deny-all** - Create policies that explicitly allow only required traffic</Check>
+<Check>**Use specific protocols and ports** - Avoid using `"protocol": "all"` when possible</Check>
+<Check>**Enable posture checks** - Require security compliance for sensitive access</Check>
+<Check>**Document policies** - Add clear descriptions explaining the purpose of each policy</Check>
+<Check>**Test before deploying** - Verify policies in a test environment first</Check>
+<Check>**Review regularly** - Audit policies periodically to ensure they're still needed</Check>

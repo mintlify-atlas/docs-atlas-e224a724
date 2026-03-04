@@ -1,0 +1,530 @@
+---
+title: netbird service
+description: Manage the NetBird daemon service
+---
+
+## Overview
+
+The `netbird service` command manages the NetBird daemon service on your system. The daemon runs in the background and maintains your NetBird connections.
+
+```bash
+netbird service <subcommand> [flags]
+```
+
+## Description
+
+The NetBird daemon service:
+
+- Runs in the background as a system service
+- Maintains persistent connections to the NetBird network
+- Automatically reconnects after network changes or system restarts
+- Manages WireGuard interface and routing
+- Handles peer connections and authentication
+
+The service integrates with your system's service manager:
+- **Linux**: systemd, SysV init, or Upstart
+- **macOS**: launchd
+- **Windows**: Windows Service Manager
+- **FreeBSD**: rc.d
+
+## Subcommands
+
+- `install` - Install NetBird as a system service
+- `uninstall` - Uninstall NetBird service from the system
+- `start` - Start the NetBird service
+- `stop` - Stop the NetBird service
+- `restart` - Restart the NetBird service
+- `status` - Show NetBird service status
+- `run` - Run NetBird as a service (used by service manager)
+- `reconfigure` - Reconfigure NetBird service with new settings
+
+## Service Flags
+
+<ParamField path="--disable-profiles" type="boolean" default="false">
+  Disables profiles feature
+  
+  If enabled, the client will not be able to change or edit any profile.
+  
+  To persist this setting:
+  ```bash
+  netbird service install --disable-profiles
+  ```
+</ParamField>
+
+<ParamField path="--disable-update-settings" type="boolean" default="false">
+  Disables update settings feature
+  
+  If enabled, the client will not be able to change or edit any settings.
+  
+  To persist this setting:
+  ```bash
+  netbird service install --disable-update-settings
+  ```
+</ParamField>
+
+## install
+
+Install NetBird as a system service.
+
+```bash
+netbird service install [flags]
+```
+
+### Flags
+
+<ParamField path="--service-env" type="string[]">
+  Sets extra environment variables for the service
+  
+  You can specify comma-separated list of KEY=VALUE pairs.
+  
+  Examples:
+  - `--service-env NB_LOG_LEVEL=debug`
+  - `--service-env NB_LOG_LEVEL=debug,CUSTOM_VAR=value`
+</ParamField>
+
+### Examples
+
+**Basic installation:**
+```bash
+sudo netbird service install
+```
+
+**Install with custom log level:**
+```bash
+sudo netbird service install --service-env NB_LOG_LEVEL=debug
+```
+
+**Install with multiple environment variables:**
+```bash
+sudo netbird service install --service-env NB_LOG_LEVEL=debug,NB_MANAGEMENT_URL=https://api.example.com
+```
+
+**Install with profiles disabled:**
+```bash
+sudo netbird service install --disable-profiles
+```
+
+**Install with custom configuration:**
+```bash
+sudo netbird service install --service-env NB_CONFIG=/opt/netbird/config.json
+```
+
+### What It Does
+
+1. Creates service configuration:
+   - **Linux (systemd)**: `/etc/systemd/system/netbird.service`
+   - **macOS (launchd)**: `/Library/LaunchDaemons/io.netbird.client.plist`
+   - **Windows**: Registers Windows Service
+   - **FreeBSD (rc.d)**: `/usr/local/etc/rc.d/netbird`
+
+2. Sets service to start on boot
+3. Configures service user and permissions
+4. Sets environment variables
+
+<Note>
+  After installation, you need to start the service:
+  ```bash
+  sudo netbird service start
+  ```
+</Note>
+
+## uninstall
+
+Uninstall NetBird service from the system.
+
+```bash
+netbird service uninstall
+```
+
+### Examples
+
+**Uninstall service:**
+```bash
+sudo netbird service uninstall
+```
+
+### What It Does
+
+1. Stops the service if running
+2. Removes service configuration files
+3. Disables automatic startup
+4. Does NOT remove:
+   - Configuration files (`/etc/netbird/config.json`)
+   - Log files
+   - NetBird binary
+
+<Warning>
+  Uninstalling the service will disconnect you from the NetBird network. Your configuration files will be preserved.
+</Warning>
+
+## start
+
+Start the NetBird service.
+
+```bash
+netbird service start
+```
+
+### Examples
+
+**Start service:**
+```bash
+sudo netbird service start
+```
+
+### Behavior
+
+- Starts the NetBird daemon
+- If auto-connect is enabled (default), automatically runs `netbird up`
+- Service continues running in background
+- Survives terminal/SSH session closure
+
+## stop
+
+Stop the NetBird service.
+
+```bash
+netbird service stop
+```
+
+### Examples
+
+**Stop service:**
+```bash
+sudo netbird service stop
+```
+
+### Behavior
+
+- Disconnects from NetBird network
+- Stops the daemon process
+- Does not uninstall the service
+- Service will not auto-start on reboot if stopped manually (on some systems)
+
+## restart
+
+Restart the NetBird service.
+
+```bash
+netbird service restart
+```
+
+### Examples
+
+**Restart service:**
+```bash
+sudo netbird service restart
+```
+
+**Useful after configuration changes:**
+```bash
+# Edit config
+sudo vi /etc/netbird/config.json
+# Restart to apply
+sudo netbird service restart
+```
+
+### Behavior
+
+1. Stops the service gracefully
+2. Disconnects all peers
+3. Starts the service again
+4. Re-establishes connections
+
+## status
+
+Show NetBird service status.
+
+```bash
+netbird service status
+```
+
+### Examples
+
+**Check service status:**
+```bash
+sudo netbird service status
+```
+
+**Example output (systemd):**
+```
+● netbird.service - Netbird
+   Loaded: loaded (/etc/systemd/system/netbird.service; enabled; vendor preset: enabled)
+   Active: active (running) since Mon 2024-01-15 10:30:00 UTC; 2h 15min ago
+ Main PID: 1234 (netbird)
+    Tasks: 12 (limit: 4915)
+   Memory: 45.2M
+   CGroup: /system.slice/netbird.service
+           └─1234 /usr/bin/netbird service run
+```
+
+### Status Information
+
+- **Loaded**: Service configuration loaded
+- **Active**: Current running state
+- **Enabled**: Will start on boot
+- **PID**: Process ID
+- **Uptime**: How long service has been running
+- **Memory**: Memory usage
+
+## run
+
+Run NetBird as a service. This command is used by the service manager and should not be called directly.
+
+```bash
+netbird service run
+```
+
+<Warning>
+  Do not run this command directly. Use `netbird service start` instead.
+</Warning>
+
+## reconfigure
+
+Reconfigure NetBird service with new settings without manual uninstall/install.
+
+```bash
+netbird service reconfigure [flags]
+```
+
+### Flags
+
+Same flags as `install` command:
+- `--service-env`
+- `--disable-profiles`
+- `--disable-update-settings`
+
+### Examples
+
+**Update environment variables:**
+```bash
+sudo netbird service reconfigure --service-env NB_LOG_LEVEL=debug,NB_MANAGEMENT_URL=https://new-api.example.com
+```
+
+**Enable profiles:**
+```bash
+sudo netbird service reconfigure
+```
+
+### Behavior
+
+1. Stops the service if running
+2. Updates service configuration
+3. Restarts the service if it was running
+
+## Complete Setup Example
+
+### Initial Installation
+
+```bash
+# 1. Install NetBird (if not already installed)
+curl -sSL https://pkgs.netbird.io/install.sh | bash
+
+# 2. Install service
+sudo netbird service install
+
+# 3. Start service
+sudo netbird service start
+
+# 4. Check status
+sudo netbird service status
+
+# 5. Connect to network
+netbird up
+```
+
+### With Custom Configuration
+
+```bash
+# Install with custom settings
+sudo netbird service install \
+  --service-env NB_LOG_LEVEL=debug,NB_MANAGEMENT_URL=https://api.example.com
+
+# Start service
+sudo netbird service start
+
+# Connect with setup key
+netbird up --setup-key YOUR_SETUP_KEY
+```
+
+## Service Environment Variables
+
+Common environment variables to set via `--service-env`:
+
+### NetBird Configuration
+
+- `NB_CONFIG` - Configuration file path
+- `NB_LOG_LEVEL` - Log level (trace, debug, info, warn, error)
+- `NB_LOG_FILE` - Log file path
+- `NB_MANAGEMENT_URL` - Management server URL
+- `NB_ADMIN_URL` - Admin panel URL
+- `NB_NO_BROWSER` - Disable browser for SSO (true/false)
+
+### Example
+
+```bash
+sudo netbird service install --service-env \
+  NB_CONFIG=/opt/netbird/config.json,\
+  NB_LOG_LEVEL=debug,\
+  NB_LOG_FILE=/var/log/netbird/debug.log,\
+  NB_MANAGEMENT_URL=https://management.example.com
+```
+
+## Platform-Specific Details
+
+### Linux (systemd)
+
+**Service file location:**
+```
+/etc/systemd/system/netbird.service
+```
+
+**Manual service management:**
+```bash
+sudo systemctl status netbird
+sudo systemctl start netbird
+sudo systemctl stop netbird
+sudo systemctl restart netbird
+sudo systemctl enable netbird
+sudo systemctl disable netbird
+```
+
+**View logs:**
+```bash
+sudo journalctl -u netbird -f
+```
+
+### macOS (launchd)
+
+**Service file location:**
+```
+/Library/LaunchDaemons/io.netbird.client.plist
+```
+
+**Manual service management:**
+```bash
+sudo launchctl load /Library/LaunchDaemons/io.netbird.client.plist
+sudo launchctl unload /Library/LaunchDaemons/io.netbird.client.plist
+```
+
+**View logs:**
+```bash
+tail -f /var/log/netbird/client.log
+```
+
+### Windows
+
+**Service name:** `Netbird`
+
+**Manual service management (PowerShell):**
+```powershell
+Get-Service Netbird
+Start-Service Netbird
+Stop-Service Netbird
+Restart-Service Netbird
+```
+
+**View logs:**
+```powershell
+Get-Content $env:PROGRAMDATA\Netbird\client.log -Wait
+```
+
+## Troubleshooting
+
+### Service Won't Start
+
+**Check service status:**
+```bash
+sudo netbird service status
+```
+
+**View logs:**
+```bash
+# Linux (systemd)
+sudo journalctl -u netbird -n 50
+
+# macOS
+tail -50 /var/log/netbird/client.log
+
+# Windows
+type %PROGRAMDATA%\Netbird\client.log
+```
+
+**Check permissions:**
+```bash
+# Ensure NetBird binary is executable
+ls -l $(which netbird)
+
+# Check config directory
+ls -la /etc/netbird/
+```
+
+### Service Starts But Can't Connect
+
+**Check if service is running:**
+```bash
+netbird status
+```
+
+**Restart service:**
+```bash
+sudo netbird service restart
+netbird up
+```
+
+### Permission Denied
+
+Service commands typically require root/administrator privileges:
+
+```bash
+# Linux/macOS
+sudo netbird service <command>
+
+# Windows (run as Administrator)
+netbird service <command>
+```
+
+## Auto-Start on Boot
+
+The service is configured to start automatically on boot after installation.
+
+### Disable Auto-Start
+
+**Linux (systemd):**
+```bash
+sudo systemctl disable netbird
+```
+
+**macOS (launchd):**
+```bash
+sudo launchctl unload -w /Library/LaunchDaemons/io.netbird.client.plist
+```
+
+**Windows:**
+```powershell
+Set-Service -Name Netbird -StartupType Manual
+```
+
+### Re-enable Auto-Start
+
+**Linux (systemd):**
+```bash
+sudo systemctl enable netbird
+```
+
+**macOS (launchd):**
+```bash
+sudo launchctl load -w /Library/LaunchDaemons/io.netbird.client.plist
+```
+
+**Windows:**
+```powershell
+Set-Service -Name Netbird -StartupType Automatic
+```
+
+## See Also
+
+- [netbird up](/cli/up) - Connect to network
+- [netbird down](/cli/down) - Disconnect from network
+- [netbird status](/cli/status) - Check connection status
+- [Installation Guide](/installation)

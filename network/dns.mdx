@@ -1,0 +1,636 @@
+---
+title: DNS
+description: Configure private DNS resolution in your NetBird network
+---
+
+# DNS
+
+NetBird provides private DNS capabilities that allow you to:
+
+- Resolve private domain names within your network
+- Use custom nameservers for specific domains
+- Implement split DNS configurations
+- Control DNS resolution per peer group
+
+## DNS Architecture
+
+NetBird's DNS system consists of two main components:
+
+### 1. Nameserver Groups
+
+Nameserver groups define DNS servers and the domains they handle. Each group specifies:
+
+- List of DNS nameservers
+- Domains to match
+- Peer groups that should use this DNS configuration
+- Whether the nameserver group is primary or domain-specific
+
+### 2. DNS Settings
+
+Account-level DNS settings control:
+
+- Which peer groups have DNS management disabled
+- Global DNS behavior
+
+## Nameserver Groups
+
+A nameserver group contains DNS server configuration and distribution rules:
+
+```go
+type NameServerGroup struct {
+    ID                   string       // Unique identifier
+    Name                 string       // Group name (1-40 chars)
+    Description          string       // Purpose description
+    NameServers          []NameServer // DNS servers (1-3 servers)
+    Groups               []string     // Distribution groups
+    Primary              bool         // Primary resolver
+    Domains              []string     // Match domains
+    Enabled              bool         // Active status
+    SearchDomainsEnabled bool         // Add to search domains
+}
+```
+
+### Nameserver Configuration
+
+Each nameserver specifies:
+
+```go
+type NameServer struct {
+    IP     netip.Addr       // DNS server IP address
+    NSType NameServerType   // Server type (UDP)
+    Port   int              // DNS port (typically 53)
+}
+```
+
+Currently supported:
+- **UDP nameservers**: Standard DNS over UDP
+
+Format: `udp://1.1.1.1:53`
+
+<Note>
+NetBird validates that each nameserver group has between 1 and 3 nameservers. This limit ensures reliable DNS resolution without overwhelming client configurations.
+</Note>
+
+## Primary vs. Domain-Specific Nameservers
+
+### Primary Nameservers
+
+Primary nameservers handle all DNS queries that don't match domain-specific rules:
+
+```yaml
+Name: "Default DNS"
+Primary: true
+Domains: []  # Empty for primary
+NameServers:
+  - udp://1.1.1.1:53
+  - udp://8.8.8.8:53
+Groups: ["all-peers"]
+```
+
+Characteristics:
+- Acts as the default/fallback resolver
+- Cannot have domains specified
+- Cannot have search domains enabled
+- Handles all queries not matched by domain-specific groups
+
+### Domain-Specific Nameservers
+
+Domain-specific nameservers handle queries for particular domains:
+
+```yaml
+Name: "Internal Services"
+Primary: false
+Domains: ["internal.company.com", "service.local"]
+NameServers:
+  - udp://10.0.0.53:53
+Groups: ["employees"]
+SearchDomainsEnabled: true
+```
+
+Characteristics:
+- Handles only specified domains
+- Must have at least one domain
+- Can be added to search domains list
+- Takes precedence over primary nameservers for matched domains
+
+<Accordion title="What are search domains?">
+Search domains are automatically appended to incomplete hostnames. For example:
+
+With search domain `company.com`:
+- Query: `server1` → Resolves as `server1.company.com`
+- Query: `server1.company.com` → Resolves as-is
+
+This simplifies accessing internal resources by allowing short names.
+
+In NetBird:
+```yaml
+Domains: ["company.com"]
+SearchDomainsEnabled: true
+```
+
+Peers in the distribution groups can use `server1` instead of `server1.company.com`.
+</Accordion>
+
+## Creating Nameserver Groups
+
+<Steps>
+
+### Define the Nameserver Group
+
+Determine the purpose:
+
+```
+Name: "AWS Internal DNS"
+Description: "Private DNS for AWS VPC resources"
+```
+
+### Configure DNS Servers
+
+Add 1-3 nameserver addresses:
+
+```
+NameServers:
+  - IP: 10.0.0.2, Port: 53, Type: UDP
+```
+
+### Set Primary or Domains
+
+Choose one:
+
+**For primary nameserver:**
+```yaml
+Primary: true
+Domains: []
+```
+
+**For domain-specific:**
+```yaml
+Primary: false
+Domains: ["aws.internal", "vpc.local"]
+```
+
+### Select Distribution Groups
+
+Choose which peers receive this DNS configuration:
+
+```yaml
+Groups: ["cloud-team", "engineering"]
+```
+
+### Enable and Save
+
+```yaml
+Enabled: true
+```
+
+The configuration is distributed to peers immediately.
+
+</Steps>
+
+## DNS Configuration Examples
+
+### Basic Primary DNS
+
+```yaml
+Name: "Public DNS"
+Description: "Cloudflare public DNS for all queries"
+Primary: true
+Domains: []
+NameServers:
+  - udp://1.1.1.1:53
+  - udp://1.0.0.1:53
+Enabled: true
+Groups: ["all-peers"]
+SearchDomainsEnabled: false
+```
+
+### Internal Domain DNS
+
+```yaml
+Name: "Corporate Internal"
+Description: "DNS for internal company domains"
+Primary: false
+Domains: ["internal.company.com", "corp.local"]
+NameServers:
+  - udp://10.0.0.53:53
+  - udp://10.0.1.53:53
+Enabled: true
+Groups: ["employees", "contractors"]
+SearchDomainsEnabled: true
+```
+
+### Split DNS Configuration
+
+```yaml
+# Primary for internet
+Name: "Internet DNS"
+Primary: true
+NameServers:
+  - udp://8.8.8.8:53
+Groups: ["all-peers"]
+
+# Internal domains
+Name: "Private Networks"
+Primary: false
+Domains: ["private.company.com"]
+NameServers:
+  - udp://192.168.1.53:53
+Groups: ["internal-team"]
+
+# Cloud domains
+Name: "AWS DNS"
+Primary: false  
+Domains: ["aws.company.com", "ec2.internal"]
+NameServers:
+  - udp://10.100.0.2:53
+Groups: ["cloud-team"]
+```
+
+### Development Environment DNS
+
+```yaml
+Name: "Dev Environment"
+Description: "DNS for development and testing"
+Primary: false
+Domains: ["dev.company.com", "test.local"]
+NameServers:
+  - udp://172.16.0.53:53
+Enabled: true
+Groups: ["developers", "qa-team"]
+SearchDomainsEnabled: true
+```
+
+## DNS Settings
+
+Account-level DNS settings provide additional control:
+
+```go
+type DNSSettings struct {
+    DisabledManagementGroups []string // Groups with DNS management disabled
+}
+```
+
+### Disabled Management Groups
+
+Peers in disabled management groups don't receive DNS configuration from NetBird:
+
+```yaml
+DisabledManagementGroups: ["external-contractors", "iot-devices"]
+```
+
+Use cases:
+- Exclude specific peers from NetBird DNS management
+- Allow peers to use their own DNS configuration
+- Prevent DNS conflicts on certain devices
+
+<Warning>
+When you add a group to disabled management groups, peers in that group immediately stop receiving DNS updates from NetBird. They will revert to their system's default DNS configuration.
+</Warning>
+
+## DNS Resolution Flow
+
+When a NetBird peer needs to resolve a domain name:
+
+<Steps>
+
+### Check Disabled Management
+
+If the peer's group is in `DisabledManagementGroups`, use system DNS (NetBird DNS is skipped).
+
+### Match Domain-Specific Rules
+
+Check if the query matches any domain-specific nameserver groups:
+
+```
+Query: api.internal.company.com
+
+Nameserver Group: "Internal DNS"
+Domains: ["internal.company.com"]
+→ Match found, use 10.0.0.53
+```
+
+### Use Primary Nameserver
+
+If no domain-specific match, use the primary nameserver group:
+
+```
+Query: google.com
+
+Nameserver Group: "Primary DNS"
+Primary: true
+→ Use 1.1.1.1
+```
+
+### Fall Back to System DNS
+
+If no NetBird DNS configuration matches, use the system's default DNS.
+
+</Steps>
+
+## DNS Validation
+
+NetBird validates nameserver groups when creating or updating:
+
+```go
+// From nameserver.go:validateNameServerGroup
+func validateNameServerGroup(ctx context.Context, transaction store.Store, 
+    accountID string, nameserverGroup *NameServerGroup) error
+```
+
+Validation rules:
+
+1. **Primary XOR Domains**: Must be primary OR have domains, not both
+2. **Nameserver count**: Must have 1-3 nameservers
+3. **Name uniqueness**: Names must be unique within the account
+4. **Name length**: 1-40 characters
+5. **Domain format**: Domains must be valid DNS names
+6. **No wildcards**: Wildcard domains (*.example.com) are not allowed for nameservers
+7. **Group existence**: All referenced groups must exist
+8. **Search domains**: Cannot enable search domains for primary nameservers
+
+### Domain Validation
+
+```go
+// From nameserver.go:validateDomain
+func validateDomain(d string) error
+```
+
+Domains are validated to ensure:
+- Valid DNS syntax
+- No wildcard prefixes
+- Proper punycode for international domains
+- Optional trailing dot (FQDN format) is allowed
+
+Examples:
+- ✅ `"example.com"`
+- ✅ `"api.service.local"`
+- ✅ `"example.com."` (FQDN with trailing dot)
+- ✅ `"münchen.de"` (converted to punycode)
+- ❌ `"*.example.com"` (wildcards not allowed)
+
+## DNS Updates and Peer Impact
+
+Changes to nameserver groups and DNS settings trigger peer updates intelligently:
+
+```go
+// From nameserver.go:areNameServerGroupChangesAffectPeers
+func areNameServerGroupChangesAffectPeers(ctx context.Context, 
+    transaction store.Store, newNSGroup, oldNSGroup *NameServerGroup) (bool, error)
+```
+
+Peer updates occur only when:
+- The nameserver group is enabled (or becomes enabled)
+- Distribution groups contain peers or resources
+- DNS settings changes affect groups with peers
+
+This optimization minimizes unnecessary network updates.
+
+## DNS Event Logging
+
+All DNS operations are logged for audit purposes:
+
+**Nameserver group events:**
+- `NameserverGroupCreated`: New nameserver group created
+- `NameserverGroupUpdated`: Nameserver group modified
+- `NameserverGroupDeleted`: Nameserver group removed
+
+**DNS settings events:**
+- `GroupAddedToDisabledManagementGroups`: Group excluded from DNS management
+- `GroupRemovedFromDisabledManagementGroups`: Group included in DNS management
+
+Event metadata:
+```go
+meta := map[string]any{"name": nsGroup.Name}
+```
+
+## DNS Best Practices
+
+<Accordion title="Use Descriptive Names">
+Name nameserver groups based on their purpose:
+
+✅ Good:
+- `"Corporate Internal DNS"`
+- `"AWS VPC Resolver"`  
+- `"Public Cloudflare DNS"`
+
+❌ Bad:
+- `"DNS1"`
+- `"Nameservers"`
+- `"Test"`
+</Accordion>
+
+<Accordion title="Implement Split DNS">
+Separate internal and external DNS resolution:
+
+```yaml
+# Internet traffic
+Primary: true
+NameServers: [Cloudflare, Google]
+
+# Internal domains  
+Primary: false
+Domains: ["*.company.com"]
+NameServers: [Internal DNS]
+```
+
+This improves security and performance.
+</Accordion>
+
+<Accordion title="Use Multiple Nameservers">
+Configure 2-3 nameservers for redundancy:
+
+```yaml
+NameServers:
+  - udp://10.0.0.53:53   # Primary
+  - udp://10.0.1.53:53   # Secondary
+  - udp://10.0.2.53:53   # Tertiary
+```
+
+If one fails, clients automatically fail over to the next.
+</Accordion>
+
+<Accordion title="Limit Distribution Groups">
+Only distribute DNS configurations to peers that need them:
+
+```yaml
+# Specific distribution
+Groups: ["engineering", "cloud-team"]
+
+# Not
+Groups: ["all-peers"]
+```
+
+This reduces configuration size and improves performance.
+</Accordion>
+
+<Accordion title="Enable Search Domains Carefully">
+Only enable search domains when beneficial:
+
+✅ Enable for:
+- Internal company domains
+- Development environments
+- Private networks
+
+❌ Avoid for:
+- Public domains
+- Third-party services
+- Primary nameservers
+
+Incorrect search domain configuration can cause DNS resolution issues.
+</Accordion>
+
+<Accordion title="Test DNS Changes">
+Before deploying DNS changes widely:
+
+1. Create a test nameserver group
+2. Distribute to a small test group
+3. Verify resolution works correctly
+4. Expand to production groups
+
+This prevents widespread DNS outages.
+</Accordion>
+
+## Common DNS Patterns
+
+### Corporate Split DNS
+
+```yaml
+# Public internet DNS
+Name: "Internet Resolution"
+Primary: true
+NameServers: ["udp://1.1.1.1:53", "udp://8.8.8.8:53"]
+Groups: ["all-peers"]
+
+# Internal corporate domains
+Name: "Corporate Internal"
+Primary: false
+Domains: ["corp.company.com", "internal.local"]
+NameServers: ["udp://10.0.0.53:53"]
+Groups: ["employees"]
+SearchDomainsEnabled: true
+```
+
+### Multi-Cloud DNS
+
+```yaml
+# AWS resources
+Name: "AWS DNS"
+Primary: false
+Domains: ["aws.company.com", "ec2.internal"]
+NameServers: ["udp://10.0.0.2:53"]
+Groups: ["cloud-team"]
+
+# Azure resources  
+Name: "Azure DNS"
+Primary: false
+Domains: ["azure.company.com"]
+NameServers: ["udp://10.1.0.2:53"]
+Groups: ["cloud-team"]
+
+# GCP resources
+Name: "GCP DNS"
+Primary: false
+Domains: ["gcp.company.com"]
+NameServers: ["udp://10.2.0.2:53"]
+Groups: ["cloud-team"]
+```
+
+### Environment-Based DNS
+
+```yaml
+# Production
+Name: "Production DNS"
+Primary: false
+Domains: ["prod.company.com"]
+NameServers: ["udp://10.100.0.53:53"]
+Groups: ["production-access"]
+
+# Staging
+Name: "Staging DNS"
+Primary: false
+Domains: ["staging.company.com"]
+NameServers: ["udp://10.200.0.53:53"]
+Groups: ["developers", "qa"]
+
+# Development
+Name: "Dev DNS"
+Primary: false
+Domains: ["dev.company.com"]
+NameServers: ["udp://10.300.0.53:53"]
+Groups: ["developers"]
+SearchDomainsEnabled: true
+```
+
+## Troubleshooting DNS
+
+<Accordion title="DNS Not Resolving">
+Check:
+
+1. Is the nameserver group enabled?
+2. Is the peer in the distribution group?
+3. Is the peer's group in disabled management groups?
+4. Are the nameserver IPs reachable from the peer?
+5. Is the domain correctly specified?
+
+Verify with:
+```bash
+# Check NetBird status
+netbird status
+
+# Test DNS resolution
+nslookup example.com
+dig example.com
+```
+</Accordion>
+
+<Accordion title="Split DNS Not Working">
+Ensure:
+
+1. Domain-specific nameserver groups are not marked as primary
+2. Domains are correctly specified without wildcards
+3. Distribution groups include the affected peers
+4. Primary nameserver exists for non-matched queries
+
+Domain matching is exact - `api.company.com` won't match nameserver group with domain `company.com`. You need to specify the full domain or use a broader match.
+</Accordion>
+
+<Accordion title="DNS Changes Not Applied">
+Possible causes:
+
+1. Peer is offline - it will receive updates when it reconnects
+2. Group membership is incorrect - verify peer is in distribution group
+3. DNS management is disabled for peer's group
+4. Changes haven't propagated yet - wait a few seconds
+
+Force peer update:
+```bash
+netbird down
+netbird up
+```
+</Accordion>
+
+## API Reference
+
+Key DNS management functions:
+
+```go
+// Nameserver Groups
+GetNameServerGroup(ctx, accountID, userID, nsGroupID) (*NameServerGroup, error)
+ListNameServerGroups(ctx, accountID, userID) ([]*NameServerGroup, error)
+CreateNameServerGroup(ctx, accountID, name, description, nameServers, 
+    groups, primary, domains, enabled, userID, searchDomainsEnabled) 
+    (*NameServerGroup, error)
+SaveNameServerGroup(ctx, accountID, userID, nsGroup) error
+DeleteNameServerGroup(ctx, accountID, nsGroupID, userID) error
+
+// DNS Settings
+GetDNSSettings(ctx, accountID, userID) (*DNSSettings, error)
+SaveDNSSettings(ctx, accountID, userID, dnsSettings) error
+```
+
+## Related Resources
+
+- [Access Control](/network/access-control) - Overview of security model
+- [Groups](/network/groups) - Organize peers for DNS distribution
+- [Routes](/network/routes) - Network routing configuration
+- [Policies](/network/policies) - Access control rules

@@ -1,0 +1,549 @@
+---
+title: Posture Checks
+description: Enforce device security requirements before granting network access
+---
+
+Posture checks allow you to verify that devices meet your security requirements before they can access network resources. NetBird evaluates device state and configuration to ensure compliance with your security policies.
+
+## Overview
+
+Posture checks enable zero-trust security by continuously validating device security posture. Only devices that pass all configured checks can access protected resources.
+
+<Info>
+Posture checks are evaluated in real-time. If a device falls out of compliance, network access is automatically restricted.
+</Info>
+
+## Available Posture Check Types
+
+NetBird supports five types of posture checks:
+
+<CardGroup cols={2}>
+  <Card title="NetBird Version" icon="code-branch">
+    Ensure peers run a minimum NetBird client version
+  </Card>
+  <Card title="OS Version" icon="desktop">
+    Require minimum operating system or kernel versions
+  </Card>
+  <Card title="Geolocation" icon="location-dot">
+    Allow or deny access based on geographic location
+  </Card>
+  <Card title="Peer Network Range" icon="network-wired">
+    Restrict based on the peer's local network address
+  </Card>
+  <Card title="Process Running" icon="gear">
+    Verify specific security software is running
+  </Card>
+</CardGroup>
+
+## NetBird Version Check
+
+Ensure all peers are running a minimum version of the NetBird client.
+
+### Configuration
+
+```json
+{
+  "Name": "Minimum NetBird Version",
+  "Description": "Require NetBird 0.24.0 or higher",
+  "Checks": {
+    "NBVersionCheck": {
+      "MinVersion": "0.24.0"
+    }
+  }
+}
+```
+
+### Use Cases
+
+- Enforce security patches and bug fixes
+- Ensure compatibility with new features
+- Phase out deprecated client versions
+- Maintain consistent security capabilities
+
+<Warning>
+Version strings must be valid semantic versions (e.g., `0.24.0`). Pre-release tags like `-dev` or `-alpha` are automatically sanitized during comparison.
+</Warning>
+
+## OS Version Check
+
+Require minimum operating system or kernel versions across different platforms.
+
+### Supported Operating Systems
+
+<Tabs>
+  <Tab title="Android">
+    ```json
+    {
+      "OSVersionCheck": {
+        "Android": {
+          "MinVersion": "11.0"
+        }
+      }
+    }
+    ```
+    
+    Checks Android OS version (e.g., Android 11, 12, 13).
+  </Tab>
+  
+  <Tab title="iOS">
+    ```json
+    {
+      "OSVersionCheck": {
+        "Ios": {
+          "MinVersion": "15.0"
+        }
+      }
+    }
+    ```
+    
+    Checks iOS version (e.g., iOS 15, 16, 17).
+  </Tab>
+  
+  <Tab title="macOS">
+    ```json
+    {
+      "OSVersionCheck": {
+        "Darwin": {
+          "MinVersion": "12.0"
+        }
+      }
+    }
+    ```
+    
+    Checks macOS version (Darwin kernel version corresponds to macOS release).
+  </Tab>
+  
+  <Tab title="Linux">
+    ```json
+    {
+      "OSVersionCheck": {
+        "Linux": {
+          "MinKernelVersion": "5.10"
+        }
+      }
+    }
+    ```
+    
+    Checks Linux kernel version. The version before the first hyphen is used (e.g., `5.10.0-21-generic` → `5.10.0`).
+  </Tab>
+  
+  <Tab title="Windows">
+    ```json
+    {
+      "OSVersionCheck": {
+        "Windows": {
+          "MinKernelVersion": "10.0.19041"
+        }
+      }
+    }
+    ```
+    
+    Checks Windows kernel version (e.g., 10.0.19041 for Windows 10 version 2004).
+  </Tab>
+</Tabs>
+
+### Multi-Platform Configuration
+
+You can specify requirements for multiple platforms in a single check:
+
+```json
+{
+  "Name": "Minimum OS Versions",
+  "Description": "Enforce modern OS versions across all platforms",
+  "Checks": {
+    "OSVersionCheck": {
+      "Android": { "MinVersion": "11.0" },
+      "Ios": { "MinVersion": "15.0" },
+      "Darwin": { "MinVersion": "12.0" },
+      "Linux": { "MinKernelVersion": "5.10" },
+      "Windows": { "MinKernelVersion": "10.0.19041" }
+    }
+  }
+}
+```
+
+<Info>
+At least one OS must be specified. Peers running operating systems not listed in the check will be denied access.
+</Info>
+
+## Geolocation Check
+
+Control access based on the peer's geographic location using country codes and city names.
+
+### Configuration
+
+```json
+{
+  "Name": "Allowed Locations",
+  "Description": "Only allow access from specific countries",
+  "Checks": {
+    "GeoLocationCheck": {
+      "Action": "allow",
+      "Locations": [
+        {
+          "CountryCode": "US"
+        },
+        {
+          "CountryCode": "GB",
+          "CityName": "London"
+        },
+        {
+          "CountryCode": "DE",
+          "CityName": "Berlin"
+        }
+      ]
+    }
+  }
+}
+```
+
+### Actions
+
+<Tabs>
+  <Tab title="Allow">
+    **Allow** action grants access only to peers in specified locations:
+    
+    ```json
+    {
+      "Action": "allow",
+      "Locations": [
+        { "CountryCode": "US" }
+      ]
+    }
+    ```
+    
+    - Peers in listed locations: **Access granted**
+    - Peers in other locations: **Access denied**
+  </Tab>
+  
+  <Tab title="Deny">
+    **Deny** action blocks access from specified locations:
+    
+    ```json
+    {
+      "Action": "deny",
+      "Locations": [
+        { "CountryCode": "CN" },
+        { "CountryCode": "RU" }
+      ]
+    }
+    ```
+    
+    - Peers in listed locations: **Access denied**
+    - Peers in other locations: **Access granted**
+  </Tab>
+</Tabs>
+
+### Location Specification
+
+**Country Code** (required):
+- 2-letter ISO 3166-1 alpha-2 format
+- Examples: `US`, `GB`, `DE`, `JP`, `AU`
+
+**City Name** (optional):
+- Commonly used English city name
+- When specified, both country and city must match
+- Example: `"CountryCode": "US", "CityName": "New York"`
+
+<Warning>
+Peers must have location information available. If location cannot be determined, access is denied for security.
+</Warning>
+
+## Peer Network Range Check
+
+Restrict access based on the peer's local network address ranges.
+
+### Configuration
+
+```json
+{
+  "Name": "Corporate Network Only",
+  "Description": "Allow only devices on corporate networks",
+  "Checks": {
+    "PeerNetworkRangeCheck": {
+      "Action": "allow",
+      "Ranges": [
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.1.0/24"
+      ]
+    }
+  }
+}
+```
+
+### Actions
+
+<Tabs>
+  <Tab title="Allow">
+    Grant access only to peers on specified networks:
+    
+    ```json
+    {
+      "Action": "allow",
+      "Ranges": ["192.168.1.0/24"]
+    }
+    ```
+    
+    - Peer on 192.168.1.x: **Access granted**
+    - Peer on other networks: **Access denied**
+  </Tab>
+  
+  <Tab title="Deny">
+    Block access from specified networks:
+    
+    ```json
+    {
+      "Action": "deny",
+      "Ranges": ["10.99.0.0/16"]
+    }
+    ```
+    
+    - Peer on 10.99.x.x: **Access denied**
+    - Peer on other networks: **Access granted**
+  </Tab>
+</Tabs>
+
+### Use Cases
+
+- Require VPN or office network connectivity
+- Block access from public WiFi networks
+- Enforce network segmentation policies
+- Prevent access from untrusted network ranges
+
+<Info>
+Network ranges are specified using CIDR notation (e.g., `192.168.1.0/24`). The check compares the peer's local network addresses against the masked prefixes.
+</Info>
+
+## Process Check
+
+Verify that specific security software or processes are running on the peer device.
+
+### Configuration
+
+```json
+{
+  "Name": "Required Security Software",
+  "Description": "Ensure endpoint protection is active",
+  "Checks": {
+    "ProcessCheck": {
+      "Processes": [
+        {
+          "LinuxPath": "/usr/bin/antivirus-daemon",
+          "MacPath": "/Applications/SecuritySoftware.app/Contents/MacOS/daemon",
+          "WindowsPath": "C:\\Program Files\\SecuritySoftware\\agent.exe"
+        }
+      ]
+    }
+  }
+}
+```
+
+### Process Specification
+
+Each process can have platform-specific paths:
+
+| Platform | Field | Example |
+|----------|-------|---------||
+| Linux | `LinuxPath` | `/usr/sbin/security-agent` |
+| macOS | `MacPath` | `/Library/Application Support/Security/agent` |
+| Windows | `WindowsPath` | `C:\\Program Files\\Security\\agent.exe` |
+
+<Warning>
+Use double backslashes (`\\`) for Windows paths in JSON configuration.
+</Warning>
+
+### Multiple Processes
+
+Require multiple security tools to be running:
+
+```json
+{
+  "ProcessCheck": {
+    "Processes": [
+      {
+        "LinuxPath": "/usr/bin/antivirus",
+        "MacPath": "/Applications/Antivirus.app/Contents/MacOS/antivirus",
+        "WindowsPath": "C:\\Program Files\\Antivirus\\av.exe"
+      },
+      {
+        "LinuxPath": "/usr/sbin/firewall-daemon",
+        "MacPath": "/Library/Firewall/daemon",
+        "WindowsPath": "C:\\Windows\\System32\\firewall.exe"
+      },
+      {
+        "LinuxPath": "/opt/edr/agent",
+        "MacPath": "/Applications/EDR.app/Contents/MacOS/agent",
+        "WindowsPath": "C:\\Program Files\\EDR\\agent.exe"
+      }
+    ]
+  }
+}
+```
+
+<Info>
+All specified processes must be running for the check to pass. At least one platform path must be specified per process.
+</Info>
+
+## Combining Multiple Checks
+
+Create comprehensive security policies by combining multiple posture check types:
+
+```json
+{
+  "Name": "Production Access Requirements",
+  "Description": "Strict security requirements for production environment access",
+  "Checks": {
+    "NBVersionCheck": {
+      "MinVersion": "0.24.0"
+    },
+    "OSVersionCheck": {
+      "Windows": { "MinKernelVersion": "10.0.19041" },
+      "Darwin": { "MinVersion": "12.0" },
+      "Linux": { "MinKernelVersion": "5.10" }
+    },
+    "GeoLocationCheck": {
+      "Action": "allow",
+      "Locations": [
+        { "CountryCode": "US" },
+        { "CountryCode": "GB" }
+      ]
+    },
+    "PeerNetworkRangeCheck": {
+      "Action": "allow",
+      "Ranges": ["10.0.0.0/8", "192.168.0.0/16"]
+    },
+    "ProcessCheck": {
+      "Processes": [
+        {
+          "LinuxPath": "/usr/bin/endpoint-security",
+          "MacPath": "/Applications/Security.app/Contents/MacOS/security",
+          "WindowsPath": "C:\\Program Files\\Security\\endpoint.exe"
+        }
+      ]
+    }
+  }
+}
+```
+
+<Warning>
+When multiple check types are defined, **all** checks must pass for the peer to gain access. This creates an AND relationship between checks.
+</Warning>
+
+## Managing Posture Checks
+
+### Creating a Posture Check
+
+<Steps>
+  <Step title="Define Requirements">
+    Identify the security requirements for your environment.
+  </Step>
+  
+  <Step title="Create Check Configuration">
+    Use the API or UI to create a posture check with your requirements.
+  </Step>
+  
+  <Step title="Test with Limited Scope">
+    Apply the check to a small group first to verify it works as expected.
+  </Step>
+  
+  <Step title="Monitor Compliance">
+    Review which peers pass or fail the check.
+  </Step>
+  
+  <Step title="Roll Out">
+    Apply the check to broader peer groups or network policies.
+  </Step>
+</Steps>
+
+### Validation Rules
+
+Posture checks must meet these requirements:
+
+- **Name**: Cannot be empty
+- **Checks**: At least one check type must be defined
+- **Version formats**: Must be valid semantic versions
+- **Country codes**: Must be 2-letter ISO 3166-1 alpha-2 format
+- **Network ranges**: Must be valid CIDR notation
+- **Process paths**: At least one platform path required per process
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Peer Failing Unexpected Checks">
+    **Diagnosis:**
+    - Check peer metadata to see reported values
+    - Review peer logs for check evaluation details
+    - Verify check configuration matches intent
+    
+    **Common causes:**
+    - Outdated peer information
+    - Incorrect version format or comparison
+    - Location data not available
+    - Process path mismatch
+  </Accordion>
+  
+  <Accordion title="Geolocation Not Working">
+    **Possible issues:**
+    - Peer location not being determined
+    - GeoIP database out of date
+    - Peer behind VPN/proxy obscuring location
+    
+    **Solutions:**
+    - Verify peer has valid external IP
+    - Update GeoIP database if self-hosted
+    - Consider network range checks instead for VPN users
+  </Accordion>
+  
+  <Accordion title="Process Check Always Failing">
+    **Verification steps:**
+    1. Check exact process path on target system
+    2. Ensure process is actually running
+    3. Verify path formatting (especially Windows backslashes)
+    4. Check file permissions for NetBird to query processes
+    
+    **Platform-specific:**
+    - **Linux**: Process must be visible in peer's process list
+    - **macOS**: May require additional permissions for process enumeration
+    - **Windows**: Ensure correct case and escaped backslashes
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Start Permissive">
+    Begin with lenient requirements and gradually tighten based on compliance data.
+  </Step>
+  
+  <Step title="Layer Defenses">
+    Use multiple complementary check types for defense in depth.
+  </Step>
+  
+  <Step title="Plan for Exceptions">
+    Have a process for temporary exceptions during incidents or maintenance.
+  </Step>
+  
+  <Step title="Monitor Continuously">
+    Set up alerting for sudden drops in compliance rates.
+  </Step>
+  
+  <Step title="Communicate Changes">
+    Notify users before enforcing new posture requirements.
+  </Step>
+  
+  <Step title="Document Requirements">
+    Maintain clear documentation of why each check exists and what it protects.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Access Policies" icon="shield-halved" href="/network/access-control">
+    Apply posture checks to network policies
+  </Card>
+  <Card title="Quantum Resistance" icon="atom" href="/security/quantum-resistance">
+    Enable post-quantum cryptography
+  </Card>
+</CardGroup>

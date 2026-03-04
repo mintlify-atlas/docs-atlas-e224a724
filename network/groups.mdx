@@ -1,0 +1,317 @@
+---
+title: Groups
+description: Organize peers and users with NetBird groups
+---
+
+# Groups
+
+Groups are the fundamental building blocks of NetBird's access control system. They allow you to organize peers (network devices) and users into logical collections that can be referenced in policies, routes, and DNS configurations.
+
+## Group Types
+
+NetBird supports different types of groups based on how they're created:
+
+### API Groups
+
+Created manually through the NetBird dashboard or API. These are the most common type of group.
+
+```
+Issued: "api"
+Manually managed membership
+Full control over peers and resources
+```
+
+### JWT Groups
+
+Automatically synchronized from your identity provider (IdP) based on JWT token claims. These groups reflect your organization's existing user directory.
+
+```
+Issued: "jwt"
+Auto-populated from IdP
+Membership managed by identity provider
+```
+
+<Note>
+JWT groups are synchronized when users authenticate. Group membership is automatically updated based on the user's claims in the JWT token.
+</Note>
+
+### Integration Groups
+
+Created by third-party integrations and automation tools.
+
+```
+Issued: "integration"
+Managed by service users
+Requires admin privileges to delete
+```
+
+<Warning>
+Integration groups can only be deleted by admin service users. This prevents accidental deletion of groups managed by automated systems.
+</Warning>
+
+## Creating Groups
+
+Groups can be created through the NetBird dashboard, API, or CLI.
+
+<Steps>
+
+### Navigate to Groups
+
+In the NetBird dashboard, go to the "Groups" section.
+
+### Create a New Group
+
+Click "Add Group" and provide:
+- **Name**: A descriptive identifier (e.g., `production-servers`, `dev-team`)
+- **Description**: Optional details about the group's purpose
+
+### Add Peers
+
+Select the peers (devices) that should be members of this group. You can:
+- Add peers individually
+- Use auto-grouping via setup keys
+- Sync from identity provider groups (JWT)
+
+### Save the Group
+
+The group is immediately available for use in policies, routes, and DNS configurations.
+
+</Steps>
+
+## Group Membership
+
+### Manual Membership
+
+For API groups, you explicitly add and remove peers:
+
+```go
+// From group.go
+func (am *DefaultAccountManager) GroupAddPeer(ctx context.Context, 
+    accountID, groupID, peerID string) error
+
+func (am *DefaultAccountManager) GroupDeletePeer(ctx context.Context, 
+    accountID, groupID, peerID string) error
+```
+
+Changes to group membership trigger an immediate network update, and affected peers receive the new configuration.
+
+### Auto-Grouping with Setup Keys
+
+When creating setup keys, you can specify auto-groups. Peers registered with that setup key are automatically added to the specified groups.
+
+```
+Setup Key Configuration:
+├── Name: "office-devices"
+├── Auto Groups: ["all-peers", "office-network"]
+└── Usage: Peers joining with this key auto-join both groups
+```
+
+### Auto-Grouping with User Assignment
+
+Users can have auto-groups assigned. When a user's device joins the network, it's automatically added to the user's groups.
+
+```
+User Configuration:
+├── Email: "alice@example.com"
+├── Auto Groups: ["engineering", "remote-workers"]
+└── Usage: Alice's devices auto-join these groups
+```
+
+## The "All" Group
+
+Every NetBird account has a special built-in group called **"All"**:
+
+- Contains all peers in the account
+- Automatically includes new peers
+- Cannot be deleted
+- Useful for account-wide policies
+
+<Warning>
+The "All" group cannot be deleted. This is a protected system group that always represents your entire peer network.
+</Warning>
+
+## Group Resources
+
+Groups can contain not only peers but also network resources:
+
+```go
+// From group.go
+type Group struct {
+    ID        string
+    Name      string
+    Peers     []string    // List of peer IDs
+    Resources []Resource  // Network resources
+    Issued    string      // "api", "jwt", or "integration"
+}
+```
+
+Resources allow groups to represent logical network segments, including:
+- Subnets accessible via routing peers
+- Network services
+- Cloud resources
+
+## Group Validation
+
+When creating or updating groups, NetBird validates:
+
+- **Unique names**: For API groups, names must be unique within the account
+- **Valid peer IDs**: Referenced peers must exist in the account
+- **ID assignment**: Integration/JWT groups require pre-assigned IDs; API groups get auto-generated IDs
+
+```go
+// From group.go:validateNewGroup
+// API groups without ID get auto-generated xid
+if newGroup.ID == "" && newGroup.Issued == types.GroupIssuedAPI {
+    newGroup.ID = xid.New().String()
+}
+```
+
+## Group Dependencies
+
+Before deleting a group, NetBird checks if it's referenced by:
+
+- **Policies**: Source or destination groups in access rules
+- **Routes**: Peer groups, distribution groups, or access control groups
+- **DNS**: Nameserver distribution groups
+- **Setup Keys**: Auto-group assignments
+- **Users**: Auto-group assignments
+- **Settings**: DNS disabled management groups, integrated validators
+
+<Accordion title="Why can't I delete this group?">
+Groups cannot be deleted if they're referenced by other resources. You'll receive an error message indicating what resource is using the group. Remove the group from those resources first, then try deleting again.
+
+Example error:
+```
+group has been linked to policy: Production Access
+```
+
+To resolve: Edit the "Production Access" policy to remove this group from its source or destination groups.
+</Accordion>
+
+## Group Operations and Performance
+
+Group changes are optimized to minimize network updates:
+
+```go
+// From group.go:areGroupChangesAffectPeers
+// Only trigger peer updates if the group is actually used
+updateAccountPeers, err = areGroupChangesAffectPeers(ctx, transaction, 
+    accountID, []string{groupID})
+```
+
+NetBird intelligently determines if a group change affects peer configurations by checking:
+- Is the group used in any active policies?
+- Is the group used in any enabled routes?
+- Is the group referenced in DNS nameserver configurations?
+- Does the group contain any peers or resources?
+
+Only if these conditions are met will peers receive a configuration update.
+
+## Group Best Practices
+
+<Accordion title="Use Descriptive, Hierarchical Names">
+Organize groups with a consistent naming scheme:
+
+```
+Environment-based:
+├── prod-servers
+├── staging-servers
+└── dev-servers
+
+Location-based:
+├── office-london
+├── office-nyc
+└── remote-workers
+
+Function-based:
+├── database-servers
+├── web-servers
+└── monitoring-tools
+```
+</Accordion>
+
+<Accordion title="Minimize Group Overlap">
+Avoid creating too many overlapping groups with the same peers. This makes policies harder to understand and maintain. Instead, use fewer, well-defined groups.
+
+❌ Bad:
+```
+web-servers-prod
+web-servers-prod-us-east
+web-servers-prod-primary
+```
+
+✅ Good:
+```
+prod-servers
+us-east-region
+primary-services
+```
+</Accordion>
+
+<Accordion title="Leverage Auto-Grouping">
+Use setup keys and user auto-groups to automatically organize peers as they join:
+
+```
+Setup Key: "prod-deployment"
+Auto Groups: ["all-peers", "prod-servers", "monitoring-enabled"]
+
+Result: New production servers automatically get proper access without manual group assignment.
+```
+</Accordion>
+
+<Accordion title="Document Group Purpose">
+Use clear descriptions to explain what each group represents and who should be added to it. This helps team members understand the access control structure.
+</Accordion>
+
+## Group Event Logging
+
+All group operations are logged as activity events:
+
+- `GroupCreated`: New group created
+- `GroupUpdated`: Group name or properties changed
+- `GroupDeleted`: Group removed
+- `GroupAddedToPeer`: Peer added to group
+- `GroupRemovedFromPeer`: Peer removed from group
+- `GroupAddedToDisabledManagementGroups`: Group added to DNS disabled management
+
+These events include metadata such as:
+```go
+meta := map[string]any{
+    "group": newGroup.Name,
+    "group_id": newGroup.ID,
+    "peer_ip": peer.IP.String(),
+    "peer_fqdn": peer.FQDN(dnsDomain),
+}
+```
+
+## API Reference
+
+Key group management functions from the source code:
+
+```go
+// Get a specific group
+GetGroup(ctx, accountID, groupID, userID) (*Group, error)
+
+// List all groups in account
+GetAllGroups(ctx, accountID, userID) ([]*Group, error)
+
+// Create a new group
+CreateGroup(ctx, accountID, userID, newGroup) error
+
+// Update existing group
+UpdateGroup(ctx, accountID, userID, group) error
+
+// Delete a group
+DeleteGroup(ctx, accountID, userID, groupID) error
+
+// Manage group membership
+GroupAddPeer(ctx, accountID, groupID, peerID) error
+GroupDeletePeer(ctx, accountID, groupID, peerID) error
+```
+
+## Related Resources
+
+- [Access Control](/network/access-control) - Overview of NetBird's security model
+- [Policies](/network/policies) - Create access rules using groups
+- [Routes](/network/routes) - Route traffic to group members
+- [DNS](/network/dns) - Distribute DNS to groups

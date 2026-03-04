@@ -1,0 +1,341 @@
+---
+title: Users API
+description: Manage users and service accounts
+---
+
+The Users API allows you to manage user accounts, service users, roles, and permissions in your NetBird network.
+
+## List All Users
+
+Returns a list of all users in your account.
+
+```bash
+GET /api/users
+```
+
+<ParamField query="service_user" type="boolean">
+  Filter users and return either regular users or service users
+</ParamField>
+
+<CodeGroup>
+```bash Regular Users
+curl -X GET "https://api.netbird.io/api/users?service_user=false" \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```bash Service Users
+curl -X GET "https://api.netbird.io/api/users?service_user=true" \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```json Response
+[
+  {
+    "id": "google-oauth2|277474792786460067937",
+    "email": "demo@netbird.io",
+    "name": "Tom Schulz",
+    "role": "admin",
+    "status": "active",
+    "last_login": "2023-05-05T09:00:35.477782Z",
+    "auto_groups": ["ch8i4ug6lnn4g9hqv7m0"],
+    "is_current": true,
+    "is_service_user": false,
+    "is_blocked": false,
+    "pending_approval": false,
+    "permissions": {
+      "is_restricted": false,
+      "modules": {
+        "peers": {"read": true, "create": true, "update": true, "delete": true}
+      }
+    }
+  }
+]
+```
+</CodeGroup>
+
+<ResponseField name="id" type="string">
+  User ID from the identity provider
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  User's full name from the identity provider
+</ResponseField>
+
+<ResponseField name="role" type="string">
+  User's NetBird account role: `admin`, `user`, or `owner`
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  User's status: `active`, `invited`, or `blocked`
+</ResponseField>
+
+<ResponseField name="auto_groups" type="array">
+  Group IDs to auto-assign to peers registered by this user
+</ResponseField>
+
+<ResponseField name="is_service_user" type="boolean">
+  Indicates if this is a service user (API-only account)
+</ResponseField>
+
+<ResponseField name="is_blocked" type="boolean">
+  Indicates if the user is blocked from using the system
+</ResponseField>
+
+<ResponseField name="pending_approval" type="boolean">
+  Indicates if the user requires admin approval before activation
+</ResponseField>
+
+## Get Current User
+
+Retrieve information about the currently authenticated user.
+
+```bash
+GET /api/users/current
+```
+
+```bash Example
+curl -X GET https://api.netbird.io/api/users/current \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+## Create a User
+
+Create a new service user or send an invitation to a regular user.
+
+```bash
+POST /api/users
+```
+
+<ParamField body="email" type="string">
+  User's email address to send invite to
+</ParamField>
+
+<ParamField body="name" type="string">
+  User's full name
+</ParamField>
+
+<ParamField body="role" type="string" required>
+  User's NetBird account role: `admin`, `user`, or `owner`
+</ParamField>
+
+<ParamField body="auto_groups" type="array" required>
+  Group IDs to auto-assign to peers registered by this user
+</ParamField>
+
+<ParamField body="is_service_user" type="boolean" required>
+  Set to `true` to create a service user (API-only account)
+</ParamField>
+
+<CodeGroup>
+```bash Create Regular User
+curl -X POST https://api.netbird.io/api/users \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "newuser@company.com",
+    "name": "Jane Doe",
+    "role": "user",
+    "auto_groups": ["ch8i4ug6lnn4g9hqv7m0"],
+    "is_service_user": false
+  }'
+```
+
+```bash Create Service User
+curl -X POST https://api.netbird.io/api/users \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "ci-bot@company.com",
+    "name": "CI/CD Service",
+    "role": "user",
+    "auto_groups": [],
+    "is_service_user": true
+  }'
+```
+
+```json Response
+{
+  "id": "service-user-abc123",
+  "email": "ci-bot@company.com",
+  "password": "auto-generated-password",
+  "name": "CI/CD Service",
+  "role": "user",
+  "status": "active",
+  "auto_groups": [],
+  "is_service_user": true,
+  "is_blocked": false
+}
+```
+</CodeGroup>
+
+<Note>
+When creating a service user with an embedded IdP, the response includes an auto-generated `password` field. This password is only returned once - save it securely!
+</Note>
+
+## Update a User
+
+Update user information including role, groups, and blocked status.
+
+```bash
+PUT /api/users/{userId}
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier of the user
+</ParamField>
+
+<ParamField body="role" type="string" required>
+  User's NetBird account role
+</ParamField>
+
+<ParamField body="auto_groups" type="array" required>
+  Group IDs to auto-assign to peers registered by this user
+</ParamField>
+
+<ParamField body="is_blocked" type="boolean" required>
+  Set to `true` to block the user from accessing the system
+</ParamField>
+
+```bash Example
+curl -X PUT https://api.netbird.io/api/users/google-oauth2|123456 \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "role": "admin",
+    "auto_groups": ["ch8i4ug6lnn4g9hqv7m0", "ch8i4ug6lnn4g9hqv7m1"],
+    "is_blocked": false
+  }'
+```
+
+## Delete a User
+
+Remove a user from the account. This removes the user from NetBird but typically leaves the identity provider account intact.
+
+```bash
+DELETE /api/users/{userId}
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier of the user
+</ParamField>
+
+```bash Example
+curl -X DELETE https://api.netbird.io/api/users/google-oauth2|123456 \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+<Warning>
+Deleting a user will:
+- Remove their access to the NetBird network
+- Delete all peers registered by the user (unless configured otherwise)
+- Remove them from all groups
+
+This action cannot be undone.
+</Warning>
+
+## User Approval
+
+### Approve a User
+
+Approve a user who is pending approval (when user approval is enabled in account settings).
+
+```bash
+POST /api/users/{userId}/approve
+```
+
+```bash Example
+curl -X POST https://api.netbird.io/api/users/google-oauth2|123456/approve \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+### Reject a User
+
+Reject a pending user and remove them from the account.
+
+```bash
+DELETE /api/users/{userId}/reject
+```
+
+```bash Example
+curl -X DELETE https://api.netbird.io/api/users/google-oauth2|123456/reject \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+## Resend Invitation
+
+Resend an invitation email to a user who hasn't accepted their invite yet.
+
+```bash
+POST /api/users/{userId}/invite
+```
+
+```bash Example
+curl -X POST https://api.netbird.io/api/users/google-oauth2|123456/invite \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+## Change User Password
+
+<Note>
+This endpoint is only available when the embedded identity provider (Dex) is enabled. Users can only change their own password.
+</Note>
+
+```bash
+PUT /api/users/{userId}/password
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier of the user (must be the current user)
+</ParamField>
+
+<ParamField body="old_password" type="string" required>
+  The current password
+</ParamField>
+
+<ParamField body="new_password" type="string" required>
+  The new password to set
+</ParamField>
+
+```bash Example
+curl -X PUT https://api.netbird.io/api/users/local-user-123/password \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "old_password": "currentPassword123",
+    "new_password": "newSecurePassword456!"
+  }'
+```
+
+## User Roles
+
+NetBird supports three user roles:
+
+<CardGroup cols={3}>
+  <Card title="Owner" icon="crown">
+    Full administrative access including billing and account deletion
+  </Card>
+  <Card title="Admin" icon="user-shield">
+    Manage users, peers, policies, routes, and settings
+  </Card>
+  <Card title="User" icon="user">
+    Limited access based on configured permissions
+  </Card>
+</CardGroup>
+
+## Service Users
+
+Service users are API-only accounts without dashboard access, ideal for:
+- CI/CD automation
+- Infrastructure as Code
+- Monitoring and alerting systems
+- Third-party integrations
+
+Service users:
+- Cannot log into the dashboard
+- Authenticate using Personal Access Tokens
+- Can be assigned limited permissions
+- Don't count towards user limits in some plans

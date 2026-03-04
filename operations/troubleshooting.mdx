@@ -1,0 +1,584 @@
+---
+title: Troubleshooting
+description: Diagnose and resolve common NetBird connectivity and configuration issues
+---
+
+This guide helps you diagnose and resolve common issues with NetBird deployments.
+
+## Quick Diagnostics
+
+### Check Client Status
+
+```bash
+# Basic status
+netbird status
+
+# Detailed peer status
+netbird status --detail
+
+# JSON output for parsing
+netbird status --json
+```
+
+### Generate Debug Bundle
+
+Create a comprehensive debug package with logs and system info:
+
+```bash
+# Basic debug bundle
+netbird debug bundle
+
+# Include system information
+netbird debug bundle --system-info
+
+# Include multiple log files (rotated logs)
+netbird debug bundle --log-file-count 3
+
+# Anonymize sensitive data
+netbird debug bundle --anonymize
+```
+
+The bundle includes:
+- Client logs
+- System information
+- Current status
+- Network configuration
+- Peer connection details
+
+<Info>
+Debug bundles are saved as `.tar.gz` files in your current directory.
+</Info>
+
+### Run Timed Debug Session
+
+Capture detailed logs for a specific duration:
+
+```bash
+# Run with trace logging for 5 minutes
+netbird debug for 5m
+
+# For shorter duration
+netbird debug for 30s
+```
+
+This automatically:
+1. Sets log level to trace
+2. Restarts the connection
+3. Runs for the specified time
+4. Creates a debug bundle
+5. Restores original settings
+
+## Connection Issues
+
+### Peer Not Connecting
+
+<Steps>
+  <Step title="Check daemon status">
+    ```bash
+    # Linux/macOS
+    systemctl status netbird
+    
+    # Windows (PowerShell)
+    Get-Service Netbird
+    
+    # Or use NetBird CLI
+    netbird status
+    ```
+  </Step>
+  
+  <Step title="Verify network reachability">
+    ```bash
+    # Check if you can reach the peer's public IP
+    netbird status --detail
+    
+    # Look for connection type (P2P vs Relayed)
+    # Status should be "Connected", not "Idle"
+    ```
+  </Step>
+  
+  <Step title="Check firewall rules">
+    ```bash
+    # Linux - verify WireGuard port is open
+    sudo ufw status
+    sudo iptables -L -n | grep 51820
+    
+    # Check if WireGuard interface exists
+    ip addr show wt0  # or wg0, nb0 depending on config
+    ```
+  </Step>
+  
+  <Step title="Test with increased logging">
+    ```bash
+    netbird debug log level trace
+    netbird down
+    netbird up
+    # Check logs for connection attempts
+    ```
+  </Step>
+</Steps>
+
+### NAT Traversal Failures
+
+If peers can't establish direct P2P connections:
+
+<Accordion title="Symptoms">
+- Connections show as "Relayed" instead of "P2P"
+- High latency between peers
+- `netbird status --detail` shows relay connection type
+</Accordion>
+
+<Accordion title="Diagnosis">
+```bash
+# Check connection types
+netbird status --filter-by-connection-type Relayed
+
+# Look for ICE negotiation in logs
+grep "ICE" /var/log/netbird/client.log
+grep "STUN" /var/log/netbird/client.log
+```
+</Accordion>
+
+<Accordion title="Solutions">
+1. **Verify STUN/TURN servers are accessible:**
+   ```bash
+   # Test STUN connectivity
+   nc -zvu stun.netbird.io 3478
+   ```
+
+2. **Check symmetric NAT:**
+   - Symmetric NAT prevents direct P2P
+   - Relay connection is expected behavior
+
+3. **Configure external IP mapping:**
+   ```bash
+   # If behind NAT with known public IP
+   netbird up --external-ip-map 12.34.56.78/10.0.0.1
+   ```
+
+4. **Open WireGuard port (51820/UDP):**
+   ```bash
+   # Linux UFW
+   sudo ufw allow 51820/udp
+   
+   # iptables
+   sudo iptables -A INPUT -p udp --dport 51820 -j ACCEPT
+   ```
+
+5. **Verify relay server is running:**
+   ```bash
+   curl http://relay.netbird.io:8080/health
+   ```
+</Accordion>
+
+### Authentication Failures
+
+<Accordion title="Token Expired">
+**Error:** `status: StatusSessionExpired` or `StatusLoginFailed`
+
+**Solution:**
+```bash
+# Re-login with SSO
+netbird down
+netbird up
+
+# Or with setup key
+netbird up --setup-key YOUR_SETUP_KEY
+```
+</Accordion>
+
+<Accordion title="Management Server Unreachable">
+**Error:** `failed to connect to management server`
+
+**Diagnosis:**
+```bash
+# Test connectivity
+curl -k https://api.netbird.io:443/api/peers
+
+# Check DNS resolution
+dig api.netbird.io
+
+# Test with custom URL
+netbird up --management-url https://your-management-server.com
+```
+
+**Solutions:**
+- Check firewall allows outbound HTTPS (443)
+- Verify DNS resolution
+- Check management server is running: `docker compose ps management`
+- Verify certificate validity
+</Accordion>
+
+<Accordion title="IDP Integration Issues">
+**Error:** Authentication redirects fail or timeout
+
+**Check:**
+```bash
+# Management server logs
+docker compose logs management | grep -i "idp\|auth"
+
+# Look for IDP metrics
+curl http://localhost:9090/metrics | grep idp_request_error
+```
+
+**Common causes:**
+- Incorrect IDP configuration in `management.json`
+- Network can't reach IDP endpoints
+- IDP credentials expired or invalid
+</Accordion>
+
+## DNS Issues
+
+### NetBird DNS Not Resolving
+
+<Steps>
+  <Step title="Check DNS configuration">
+    ```bash
+    # Verify NetBird DNS is configured
+    netbird status --detail
+    
+    # Check resolver address
+    cat /etc/resolv.conf | grep netbird
+    ```
+  </Step>
+  
+  <Step title="Test DNS resolution">
+    ```bash
+    # Try resolving a peer name
+    nslookup peer-a.netbird.cloud
+    dig @100.64.0.1 peer-a.netbird.cloud
+    ```
+  </Step>
+  
+  <Step title="Configure custom DNS resolver">
+    ```bash
+    # Set specific DNS resolver address
+    netbird up --dns-resolver-address 127.0.0.1:5053
+    
+    # Clear DNS configuration
+    netbird up --dns-resolver-address ""
+    ```
+  </Step>
+</Steps>
+
+### DNS Resolution Conflicts
+
+<Warning>
+NetBird DNS may conflict with existing local DNS services on port 53.
+</Warning>
+
+```bash
+# Check what's using port 53
+sudo lsof -i :53
+sudo netstat -tulpn | grep :53
+
+# Use custom DNS port
+netbird up --dns-resolver-address 127.0.0.1:5053
+```
+
+## Performance Issues
+
+### High Latency
+
+<Accordion title="Check Connection Type">
+```bash
+# Verify using P2P when possible
+netbird status --detail
+
+# If showing "Relayed", see NAT Traversal section
+# Relay adds latency due to extra hop
+```
+</Accordion>
+
+<Accordion title="Network Path Issues">
+```bash
+# Test peer latency
+ping -c 10 100.64.0.5  # Use peer's NetBird IP
+
+# Check for packet loss
+mtr 100.64.0.5
+
+# Verify WireGuard stats
+sudo wg show
+```
+</Accordion>
+
+<Accordion title="MTU Problems">
+Incorrect MTU can cause fragmentation and poor performance:
+
+```bash
+# Test with custom MTU
+netbird up --mtu 1280
+
+# Default WireGuard MTU is 1420
+# Lower if seeing fragmentation issues
+```
+</Accordion>
+
+### High CPU Usage
+
+<Steps>
+  <Step title="Check active connections">
+    ```bash
+    netbird status --detail
+    # Count number of connected peers
+    ```
+  </Step>
+  
+  <Step title="Profile CPU usage">
+    ```bash
+    # Enable CPU profiling during debug session
+    netbird debug for 2m
+    # Profile is included in debug bundle
+    ```
+  </Step>
+  
+  <Step title="Optimize connection settings">
+    ```bash
+    # Enable lazy connections (on-demand)
+    netbird up --enable-lazy-connection
+    
+    # This reduces idle peer connections
+    ```
+  </Step>
+</Steps>
+
+## Service Issues
+
+### Service Won't Start
+
+<Accordion title="Linux (systemd)">
+```bash
+# Check service status
+systemctl status netbird
+
+# View recent logs
+journalctl -u netbird -n 50
+
+# Check for service file issues
+systemctl cat netbird
+
+# Reinstall service
+netbird service stop
+netbird service uninstall
+netbird service install
+netbird service start
+```
+</Accordion>
+
+<Accordion title="Windows">
+```powershell
+# Check service status
+Get-Service Netbird
+
+# View event logs
+Get-EventLog -LogName Application -Source Netbird -Newest 20
+
+# Reinstall service
+netbird service stop
+netbird service uninstall
+netbird service install
+netbird service start
+```
+</Accordion>
+
+<Accordion title="macOS">
+```bash
+# Check launchd service
+sudo launchctl list | grep netbird
+
+# View logs
+log show --predicate 'process == "netbird"' --last 1h
+
+# Restart service
+sudo launchctl unload /Library/LaunchDaemons/io.netbird.client.plist
+sudo launchctl load /Library/LaunchDaemons/io.netbird.client.plist
+```
+</Accordion>
+
+### Configuration File Issues
+
+<Steps>
+  <Step title="Locate config file">
+    ```bash
+    # Linux
+    /etc/netbird/config.json
+    
+    # Windows
+    C:\ProgramData\Netbird\config.json
+    
+    # macOS
+    /etc/netbird/config.json
+    ```
+  </Step>
+  
+  <Step title="Validate JSON">
+    ```bash
+    # Check for syntax errors
+    cat /etc/netbird/config.json | jq .
+    ```
+  </Step>
+  
+  <Step title="Reset configuration">
+    ```bash
+    # Backup existing config
+    sudo cp /etc/netbird/config.json /etc/netbird/config.json.bak
+    
+    # Login creates fresh config
+    netbird down
+    netbird up --setup-key NEW_KEY
+    ```
+  </Step>
+</Steps>
+
+## Server Issues
+
+### Management Server Not Starting
+
+<Steps>
+  <Step title="Check container status">
+    ```bash
+    docker compose ps
+    docker compose logs management
+    ```
+  </Step>
+  
+  <Step title="Verify port availability">
+    ```bash
+    # Check if ports are already in use
+    sudo lsof -i :443  # HTTPS API
+    sudo lsof -i :33073  # gRPC
+    sudo lsof -i :9090  # Metrics
+    ```
+  </Step>
+  
+  <Step title="Check database connectivity">
+    ```bash
+    # If using PostgreSQL/MySQL
+    docker compose logs management | grep -i "database\|store"
+    
+    # Test database connection
+    docker compose exec management ping postgres
+    ```
+  </Step>
+  
+  <Step title="Validate configuration">
+    ```bash
+    # Check management.json
+    cat management.json | jq .
+    
+    # Verify environment variables
+    docker compose config | grep NETBIRD
+    ```
+  </Step>
+</Steps>
+
+### High Memory Usage (Server)
+
+<Accordion title="Large Network Maps">
+```bash
+# Check network map object count
+curl http://localhost:9090/metrics | grep network_map_object_count
+
+# Monitor account manager metrics
+curl http://localhost:9090/metrics | grep account_manager
+```
+
+**Solutions:**
+- Optimize peer groups and access rules
+- Consider splitting into multiple accounts
+- Increase container memory limits
+</Accordion>
+
+<Accordion title="Store Lock Contention">
+```bash
+# Check lock metrics
+curl http://localhost:9090/metrics | grep store_global_lock
+```
+
+**Solutions:**
+- Switch from SQLite to PostgreSQL for better concurrency
+- Reduce update frequency
+- Scale horizontally with multiple management instances
+</Accordion>
+
+## Network Configuration Issues
+
+### Interface Conflicts
+
+```bash
+# Check for interface name conflicts
+ip addr show
+
+# Use custom interface name
+netbird up --interface-name nb0
+```
+
+### Routing Issues
+
+```bash
+# Check NetBird routes
+netbird networks routes list
+
+# View system routing table
+ip route show | grep wt0  # or your interface name
+
+# Check for route conflicts
+netbird status --detail
+```
+
+### Firewall Blocking Peers
+
+<Steps>
+  <Step title="Check NetBird firewall rules">
+    ```bash
+    # Linux iptables
+    sudo iptables -L -n -v | grep wt0
+    
+    # nftables
+    sudo nft list ruleset | grep wt0
+    ```
+  </Step>
+  
+  <Step title="Verify peer access">
+    ```bash
+    # Test connectivity to peer
+    ping 100.64.0.5
+    
+    # Test specific port
+    nc -zv 100.64.0.5 22
+    ```
+  </Step>
+  
+  <Step title="Check ACL rules">
+    Review access control rules in the NetBird dashboard
+  </Step>
+</Steps>
+
+## Getting Help
+
+When seeking help, include:
+
+1. **Debug bundle:** `netbird debug bundle --anonymize`
+2. **Client version:** `netbird version`
+3. **Operating system and version**
+4. **Deployment method:** self-hosted, cloud, docker
+5. **Error messages** from logs
+6. **Network topology** (NAT types, firewalls)
+
+<Info>
+Join the NetBird community:
+- GitHub Issues: https://github.com/netbirdio/netbird/issues
+- Slack: https://netbird.io/slack
+- Documentation: https://docs.netbird.io
+</Info>
+
+## Common Error Messages
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `StatusNeedsLogin` | Not authenticated | Run `netbird up` to login |
+| `connection timeout` | Network/firewall issue | Check connectivity to management server |
+| `peer not found` | Peer offline or removed | Check peer status in dashboard |
+| `interface already exists` | Interface name conflict | Use `--interface-name` flag |
+| `permission denied` | Insufficient privileges | Run with sudo/administrator |
+| `failed to create wireguard device` | WireGuard kernel module missing | Install wireguard-tools |

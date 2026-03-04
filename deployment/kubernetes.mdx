@@ -1,0 +1,626 @@
+---
+title: Kubernetes Deployment
+description: Deploy NetBird on Kubernetes clusters with custom manifests
+---
+
+While NetBird doesn't provide official Helm charts yet, you can deploy it on Kubernetes using custom manifests based on the Docker Compose configuration.
+
+<Note>
+NetBird is primarily designed for Docker Compose deployments. Kubernetes support is community-driven. For production Kubernetes deployments, consider using [NetBird Cloud](/deployment/cloud) or contributing Helm charts to the project.
+</Note>
+
+## Prerequisites
+
+- Kubernetes cluster (v1.20+)
+- `kubectl` configured with cluster access
+- Ingress controller (nginx, Traefik, or similar)
+- Cert-manager for automatic TLS (recommended)
+- Storage class for persistent volumes
+
+## Architecture on Kubernetes
+
+A Kubernetes deployment of NetBird consists of:
+
+- **NetBird Server Deployment** - Combined server (management, signal, relay, STUN)
+- **Dashboard Deployment** - Web UI
+- **ConfigMaps** - For config.yaml and dashboard environment
+- **Secrets** - For encryption keys and OAuth secrets
+- **Services** - ClusterIP for internal communication, LoadBalancer/NodePort for STUN
+- **Ingress** - HTTPS routing to dashboard and server
+- **PersistentVolumeClaim** - For SQLite database storage
+
+## Namespace and ConfigMap
+
+### Create Namespace
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: netbird
+```
+
+### ConfigMap for Server Configuration
+
+Create a ConfigMap with the combined server configuration:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: netbird-server-config
+  namespace: netbird
+data:
+  config.yaml: |
+    server:
+      listenAddress: ":80"
+      exposedAddress: "https://netbird.example.com:443"
+      stunPorts:
+        - 3478
+      metricsPort: 9090
+      healthcheckAddress: ":9000"
+      logLevel: "info"
+      logFile: "console"
+      
+      authSecret: "your-relay-auth-secret"  # Generate with: openssl rand -base64 32
+      dataDir: "/var/lib/netbird"
+      
+      auth:
+        issuer: "https://netbird.example.com/oauth2"
+        signKeyRefreshEnabled: true
+        dashboardRedirectURIs:
+          - "https://netbird.example.com/nb-auth"
+          - "https://netbird.example.com/nb-silent-auth"
+        cliRedirectURIs:
+          - "http://localhost:53000/"
+      
+      reverseProxy:
+        trustedHTTPProxies:
+          - "10.0.0.0/8"  # Adjust for your cluster network
+      
+      store:
+        engine: "sqlite"
+        encryptionKey: ""  # Will be set from Secret
+```
+
+<Warning>
+Replace `netbird.example.com` with your actual domain. Generate secure secrets using `openssl rand -base64 32`.
+</Warning>
+
+### ConfigMap for Dashboard
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: netbird-dashboard-config
+  namespace: netbird
+data:
+  NETBIRD_MGMT_API_ENDPOINT: "https://netbird.example.com"
+  NETBIRD_MGMT_GRPC_API_ENDPOINT: "https://netbird.example.com"
+  AUTH_AUDIENCE: "netbird-dashboard"
+  AUTH_CLIENT_ID: "netbird-dashboard"
+  AUTH_AUTHORITY: "https://netbird.example.com/oauth2"
+  USE_AUTH0: "false"
+  AUTH_SUPPORTED_SCOPES: "openid profile email groups"
+  AUTH_REDIRECT_URI: "/nb-auth"
+  AUTH_SILENT_REDIRECT_URI: "/nb-silent-auth"
+  NGINX_SSL_PORT: "443"
+  LETSENCRYPT_DOMAIN: "none"
+```
+
+## Secrets
+
+Create secrets for sensitive data:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: netbird-secrets
+  namespace: netbird
+type: Opaque
+stringData:
+  datastore-encryption-key: "your-base64-encryption-key"  # openssl rand -base64 32
+  relay-auth-secret: "your-relay-secret"  # openssl rand -base64 32 | sed 's/=//g'
+```
+
+<Note>
+Store these secrets securely in your secret management system (e.g., Sealed Secrets, External Secrets Operator, or HashiCorp Vault).
+</Note>
+
+## Persistent Storage
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: netbird-data
+  namespace: netbird
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard  # Adjust for your cluster
+```
+
+## NetBird Server Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netbird-server
+  namespace: netbird
+spec:
+  replicas: 1  # Do not scale beyond 1 with SQLite
+  selector:
+    matchLabels:
+      app: netbird-server
+  template:
+    metadata:
+      labels:
+        app: netbird-server
+    spec:
+      containers:
+      - name: netbird-server
+        image: netbirdio/netbird-server:latest
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        - containerPort: 3478
+          name: stun
+          protocol: UDP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /etc/netbird/config.yaml
+          subPath: config.yaml
+        - name: data
+          mountPath: /var/lib/netbird
+        env:
+        - name: NETBIRD_STORE_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: netbird-secrets
+              key: datastore-encryption-key
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: netbird-server-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: netbird-data
+```
+
+<Warning>
+With SQLite, you cannot run multiple replicas. For high availability, configure PostgreSQL or MySQL as the database backend and set `replicas: 2+`.
+</Warning>
+
+## Dashboard Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netbird-dashboard
+  namespace: netbird
+spec:
+  replicas: 2  # Can scale horizontally
+  selector:
+    matchLabels:
+      app: netbird-dashboard
+  template:
+    metadata:
+      labels:
+        app: netbird-dashboard
+    spec:
+      containers:
+      - name: dashboard
+        image: netbirdio/dashboard:latest
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: netbird-dashboard-config
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+```
+
+## Services
+
+### NetBird Server Service
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: netbird-server
+  namespace: netbird
+spec:
+  selector:
+    app: netbird-server
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: netbird-stun
+  namespace: netbird
+spec:
+  selector:
+    app: netbird-server
+  ports:
+  - name: stun
+    port: 3478
+    targetPort: 3478
+    protocol: UDP
+  type: LoadBalancer  # Or NodePort, depending on your cluster
+```
+
+### Dashboard Service
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: netbird-dashboard
+  namespace: netbird
+spec:
+  selector:
+    app: netbird-dashboard
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  type: ClusterIP
+```
+
+## Ingress Configuration
+
+### With Nginx Ingress Controller
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: netbird
+  namespace: netbird
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"  # 1 day for gRPC
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "86400"
+    nginx.ingress.kubernetes.io/client-header-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    # Enable HTTP/2 for gRPC
+    nginx.ingress.kubernetes.io/http2-push-preload: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - netbird.example.com
+    secretName: netbird-tls
+  rules:
+  - host: netbird.example.com
+    http:
+      paths:
+      # gRPC paths (high priority)
+      - path: /signalexchange.SignalExchange
+        pathType: Prefix
+        backend:
+          service:
+            name: netbird-server
+            port:
+              number: 80
+      - path: /management.ManagementService
+        pathType: Prefix
+        backend:
+          service:
+            name: netbird-server
+            port:
+              number: 80
+      # Backend paths (relay, API, OAuth)
+      - path: /relay
+        pathType: Prefix
+        backend:
+          service:
+            name: netbird-server
+            port:
+              number: 80
+      - path: /ws-proxy
+        pathType: Prefix
+        backend:
+          service:
+            name: netbird-server
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: netbird-server
+            port:
+              number: 80
+      - path: /oauth2
+        pathType: Prefix
+        backend:
+          service:
+            name: netbird-server
+            port:
+              number: 80
+      # Dashboard (default)
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: netbird-dashboard
+            port:
+              number: 80
+```
+
+<Note>
+For gRPC to work properly, ensure your ingress controller supports HTTP/2 and has appropriate timeout settings.
+</Note>
+
+## Cert-Manager ClusterIssuer
+
+For automatic TLS certificates:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: your@email.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+```
+
+## Deployment
+
+Apply all manifests:
+
+```bash
+# Create namespace
+kubectl apply -f namespace.yaml
+
+# Create secrets (do this first)
+kubectl apply -f secrets.yaml
+
+# Create ConfigMaps
+kubectl apply -f configmap-server.yaml
+kubectl apply -f configmap-dashboard.yaml
+
+# Create PVC
+kubectl apply -f pvc.yaml
+
+# Deploy services
+kubectl apply -f deployment-server.yaml
+kubectl apply -f deployment-dashboard.yaml
+
+# Create services
+kubectl apply -f service-server.yaml
+kubectl apply -f service-dashboard.yaml
+
+# Create ingress (requires cert-manager)
+kubectl apply -f clusterissuer.yaml
+kubectl apply -f ingress.yaml
+```
+
+## Verification
+
+```bash
+# Check pod status
+kubectl get pods -n netbird
+
+# Check logs
+kubectl logs -n netbird -l app=netbird-server -f
+
+# Check ingress
+kubectl get ingress -n netbird
+
+# Test connectivity
+curl https://netbird.example.com/api/health
+```
+
+## Scaling Considerations
+
+### Using SQLite (Default)
+
+- **Cannot scale** beyond 1 replica
+- Suitable for small deployments (less than 100 peers)
+- Single point of failure
+
+### Using PostgreSQL/MySQL
+
+For production Kubernetes deployments:
+
+1. Deploy PostgreSQL or MySQL in the cluster
+2. Update config.yaml:
+   ```yaml
+   store:
+     engine: "postgres"
+     encryptionKey: "<from-secret>"
+   ```
+3. Add environment variable to deployment:
+   ```yaml
+   env:
+   - name: NETBIRD_STORE_ENGINE_POSTGRES_DSN
+     valueFrom:
+       secretKeyRef:
+         name: netbird-secrets
+         key: postgres-dsn
+   ```
+4. Scale to multiple replicas:
+   ```bash
+   kubectl scale deployment netbird-server -n netbird --replicas=3
+   ```
+
+## Monitoring
+
+### Prometheus Integration
+
+NetBird exposes metrics on port 9090:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: netbird-server-metrics
+  namespace: netbird
+  labels:
+    app: netbird-server
+spec:
+  selector:
+    app: netbird-server
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+  type: ClusterIP
+```
+
+Configure ServiceMonitor for Prometheus Operator:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: netbird-server
+  namespace: netbird
+spec:
+  selector:
+    matchLabels:
+      app: netbird-server
+  endpoints:
+  - port: metrics
+    interval: 30s
+```
+
+## Troubleshooting
+
+### Pods Not Starting
+
+```bash
+# Check pod events
+kubectl describe pod -n netbird <pod-name>
+
+# Check logs
+kubectl logs -n netbird <pod-name> --previous
+```
+
+### Ingress Issues
+
+```bash
+# Check ingress configuration
+kubectl describe ingress -n netbird netbird
+
+# Check certificate status
+kubectl get certificate -n netbird
+kubectl describe certificate -n netbird netbird-tls
+```
+
+### gRPC Connection Failures
+
+Ensure ingress controller supports:
+- HTTP/2
+- gRPC protocol
+- Extended timeouts for long-lived connections
+
+### STUN Port Not Accessible
+
+```bash
+# Check LoadBalancer external IP
+kubectl get svc -n netbird netbird-stun
+
+# Verify UDP port
+netcat -u <external-ip> 3478
+```
+
+## Community Resources
+
+- [NetBird Ansible Collection](https://galaxy.ansible.com/ui/repo/published/dominion_solutions/netbird/)
+- [Community Installer Script](https://github.com/physk/netbird-installer)
+- [NetBird GitHub Discussions](https://github.com/netbirdio/netbird/discussions)
+
+<Note>
+If you develop Helm charts or improved Kubernetes manifests, consider contributing them to the NetBird project!
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Compose" icon="docker" href="/deployment/docker-compose">
+    Simpler alternative for non-Kubernetes environments
+  </Card>
+  <Card title="NetBird Cloud" icon="cloud" href="/deployment/cloud">
+    Managed NetBird without infrastructure management
+  </Card>
+  <Card title="Access Control" icon="shield-halved" href="/network/access-control">
+    Configure network policies after deployment
+  </Card>
+  <Card title="Monitoring" icon="chart-line" href="/operations/monitoring">
+    Set up observability for your deployment
+  </Card>
+</CardGroup>

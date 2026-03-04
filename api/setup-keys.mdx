@@ -1,0 +1,445 @@
+---
+title: Setup Keys API
+description: Generate and manage setup keys for peer enrollment
+---
+
+Setup keys are used to enroll new peers into your NetBird network without requiring interactive authentication. They're ideal for automated deployments, IoT devices, and server installations.
+
+## List All Setup Keys
+
+Returns a list of all setup keys.
+
+```bash
+GET /api/setup-keys
+```
+
+<CodeGroup>
+```bash Request
+curl -X GET https://api.netbird.io/api/setup-keys \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+```json Response
+[
+  {
+    "id": "2531583362",
+    "key": "A6160****",
+    "name": "Production Servers",
+    "expires": "2024-06-01T14:47:22.291057Z",
+    "type": "reusable",
+    "valid": true,
+    "revoked": false,
+    "used_times": 5,
+    "last_used": "2024-05-15T09:00:35.477782Z",
+    "state": "valid",
+    "auto_groups": ["ch8i4ug6lnn4g9hqv7m0"],
+    "updated_at": "2024-05-05T09:00:35.477782Z",
+    "usage_limit": 0,
+    "ephemeral": false,
+    "allow_extra_dns_labels": false
+  }
+]
+```
+</CodeGroup>
+
+<ResponseField name="id" type="string">
+  Unique setup key identifier
+</ResponseField>
+
+<ResponseField name="key" type="string">
+  Setup key as a masked secret (full key only shown on creation)
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Setup key name identifier
+</ResponseField>
+
+<ResponseField name="expires" type="string">
+  Expiration date (ISO 8601 format)
+</ResponseField>
+
+<ResponseField name="type" type="string">
+  Key type: `reusable` or `one-off`
+</ResponseField>
+
+<ResponseField name="valid" type="boolean">
+  Whether the key is currently valid
+</ResponseField>
+
+<ResponseField name="revoked" type="boolean">
+  Whether the key has been revoked
+</ResponseField>
+
+<ResponseField name="used_times" type="integer">
+  Number of times this key has been used
+</ResponseField>
+
+<ResponseField name="last_used" type="string">
+  Last time the key was used (ISO 8601 format)
+</ResponseField>
+
+<ResponseField name="state" type="string">
+  Key state: `valid`, `overused`, `expired`, or `revoked`
+</ResponseField>
+
+<ResponseField name="auto_groups" type="array">
+  Group IDs to auto-assign to peers using this key
+</ResponseField>
+
+<ResponseField name="usage_limit" type="integer">
+  Usage limit (0 = unlimited)
+</ResponseField>
+
+<ResponseField name="ephemeral" type="boolean">
+  Whether peers enrolled with this key are ephemeral
+</ResponseField>
+
+<ResponseField name="allow_extra_dns_labels" type="boolean">
+  Allow extra DNS labels to be added to the peer
+</ResponseField>
+
+## Get a Setup Key
+
+Retrieve details about a specific setup key.
+
+```bash
+GET /api/setup-keys/{keyId}
+```
+
+<ParamField path="keyId" type="string" required>
+  The unique identifier of the setup key
+</ParamField>
+
+```bash Example
+curl -X GET https://api.netbird.io/api/setup-keys/2531583362 \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+## Create a Setup Key
+
+Generate a new setup key for peer enrollment.
+
+```bash
+POST /api/setup-keys
+```
+
+<ParamField body="name" type="string" required>
+  Setup key name
+</ParamField>
+
+<ParamField body="type" type="string" required>
+  Key type: `reusable` or `one-off`
+</ParamField>
+
+<ParamField body="expires_in" type="integer" required>
+  Expiration time in seconds (86400-31536000, i.e., 1 day to 1 year)
+</ParamField>
+
+<ParamField body="auto_groups" type="array" required>
+  Group IDs to auto-assign to peers registered with this key
+</ParamField>
+
+<ParamField body="usage_limit" type="integer" required>
+  Usage limit (0 = unlimited)
+</ParamField>
+
+<ParamField body="ephemeral" type="boolean" required>
+  Whether peers should be ephemeral
+</ParamField>
+
+<ParamField body="allow_extra_dns_labels" type="boolean" required>
+  Allow extra DNS labels to be added to peers
+</ParamField>
+
+<CodeGroup>
+```bash Reusable Key
+curl -X POST https://api.netbird.io/api/setup-keys \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Production Servers",
+    "type": "reusable",
+    "expires_in": 2592000,
+    "auto_groups": ["ch8i4ug6lnn4g9hqv7m0"],
+    "usage_limit": 0,
+    "ephemeral": false,
+    "allow_extra_dns_labels": false
+  }'
+```
+
+```bash One-Off Key
+curl -X POST https://api.netbird.io/api/setup-keys \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Temporary Access",
+    "type": "one-off",
+    "expires_in": 86400,
+    "auto_groups": ["ch8i4ug6lnn4g9hqv7m0"],
+    "usage_limit": 1,
+    "ephemeral": true,
+    "allow_extra_dns_labels": false
+  }'
+```
+
+```json Response
+{
+  "id": "2531583362",
+  "key": "A616097E-FCF0-48FA-9354-CA4A61142761",
+  "name": "Production Servers",
+  "expires": "2024-07-01T14:47:22.291057Z",
+  "type": "reusable",
+  "valid": true,
+  "revoked": false,
+  "used_times": 0,
+  "state": "valid",
+  "auto_groups": ["ch8i4ug6lnn4g9hqv7m0"],
+  "updated_at": "2024-06-01T14:47:22.291057Z",
+  "usage_limit": 0,
+  "ephemeral": false,
+  "allow_extra_dns_labels": false
+}
+```
+</CodeGroup>
+
+<Warning>
+The full setup key is only returned when created. Save it securely - you won't be able to retrieve it again!
+</Warning>
+
+## Update a Setup Key
+
+Update setup key configuration.
+
+```bash
+PUT /api/setup-keys/{keyId}
+```
+
+<ParamField path="keyId" type="string" required>
+  The unique identifier of the setup key
+</ParamField>
+
+<ParamField body="revoked" type="boolean" required>
+  Revoke or un-revoke the setup key
+</ParamField>
+
+<ParamField body="auto_groups" type="array" required>
+  Group IDs to auto-assign (replaces existing groups)
+</ParamField>
+
+<CodeGroup>
+```bash Revoke Key
+curl -X PUT https://api.netbird.io/api/setup-keys/2531583362 \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "revoked": true,
+    "auto_groups": ["ch8i4ug6lnn4g9hqv7m0"]
+  }'
+```
+
+```bash Update Groups
+curl -X PUT https://api.netbird.io/api/setup-keys/2531583362 \
+  -H "Authorization: Token nbp_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "revoked": false,
+    "auto_groups": [
+      "ch8i4ug6lnn4g9hqv7m0",
+      "ch8i4ug6lnn4g9hqv7m1"
+    ]
+  }'
+```
+</CodeGroup>
+
+## Delete a Setup Key
+
+Permanently delete a setup key.
+
+```bash
+DELETE /api/setup-keys/{keyId}
+```
+
+<ParamField path="keyId" type="string" required>
+  The unique identifier of the setup key
+</ParamField>
+
+```bash Example
+curl -X DELETE https://api.netbird.io/api/setup-keys/2531583362 \
+  -H "Authorization: Token nbp_YOUR_TOKEN"
+```
+
+<Note>
+Deleting a setup key does NOT remove peers that were enrolled with it. It only prevents future enrollments.
+</Note>
+
+## Key Types
+
+### Reusable Keys
+
+Can be used multiple times until expired or revoked:
+
+```json
+{
+  "type": "reusable",
+  "usage_limit": 0
+}
+```
+
+Use cases:
+- Server deployments
+- Container orchestration
+- IoT device fleets
+- Development environments
+
+### One-Off Keys
+
+Can only be used once:
+
+```json
+{
+  "type": "one-off",
+  "usage_limit": 1
+}
+```
+
+Use cases:
+- Individual device enrollment
+- Temporary access
+- High-security environments
+
+## Key States
+
+<CardGroup cols={2}>
+  <Card title="Valid" icon="check" color="#16a34a">
+    Key is active and can be used
+  </Card>
+  <Card title="Expired" icon="clock" color="#ea580c">
+    Key has passed its expiration date
+  </Card>
+  <Card title="Revoked" icon="ban" color="#dc2626">
+    Key has been manually revoked
+  </Card>
+  <Card title="Overused" icon="triangle-exclamation" color="#ca8a04">
+    Key has exceeded its usage limit
+  </Card>
+</CardGroup>
+
+## Ephemeral Peers
+
+Peers enrolled with ephemeral keys are automatically cleaned up:
+
+```json
+{
+  "ephemeral": true
+}
+```
+
+Ephemeral peers:
+- Automatically removed when disconnected
+- Don't persist in the network
+- Ideal for temporary access or testing
+
+## Using Setup Keys
+
+### Linux/macOS
+
+```bash
+sudo netbird up --setup-key YOUR_SETUP_KEY
+```
+
+### Windows
+
+```powershell
+netbird up --setup-key YOUR_SETUP_KEY
+```
+
+### Docker
+
+```bash
+docker run -d --name netbird \
+  --network host \
+  --cap-add NET_ADMIN \
+  -e NB_SETUP_KEY=YOUR_SETUP_KEY \
+  netbirdio/netbird:latest
+```
+
+### Kubernetes
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: netbird-setup-key
+type: Opaque
+stringData:
+  setup-key: YOUR_SETUP_KEY
+```
+
+## Auto-Groups
+
+Peers enrolled with a setup key are automatically added to specified groups:
+
+```json
+{
+  "auto_groups": [
+    "production-servers-group-id",
+    "us-east-region-group-id"
+  ]
+}
+```
+
+This enables:
+- Automatic policy application
+- Simplified network segmentation
+- Role-based access control
+
+## Security Best Practices
+
+<Check>**Limit expiration** - Use the shortest reasonable expiration period</Check>
+<Check>**Use one-off keys** - For individual devices when possible</Check>
+<Check>**Set usage limits** - Prevent unlimited use of reusable keys</Check>
+<Check>**Revoke unused keys** - Regularly audit and revoke old keys</Check>
+<Check>**Rotate keys** - Create new keys periodically for ongoing deployments</Check>
+<Check>**Secure storage** - Store keys in secrets managers, not version control</Check>
+<Check>**Monitor usage** - Track `used_times` and `last_used` to detect anomalies</Check>
+
+## Common Patterns
+
+### CI/CD Deployments
+
+```json
+{
+  "name": "CI/CD Pipeline",
+  "type": "reusable",
+  "expires_in": 604800,
+  "usage_limit": 100,
+  "auto_groups": ["ci-runners"],
+  "ephemeral": true
+}
+```
+
+### IoT Devices
+
+```json
+{
+  "name": "IoT Sensors",
+  "type": "reusable",
+  "expires_in": 31536000,
+  "usage_limit": 0,
+  "auto_groups": ["iot-devices"],
+  "ephemeral": false
+}
+```
+
+### Temporary Contractor Access
+
+```json
+{
+  "name": "Contractor - John Doe",
+  "type": "one-off",
+  "expires_in": 2592000,
+  "usage_limit": 1,
+  "auto_groups": ["contractors"],
+  "ephemeral": false
+}
+```

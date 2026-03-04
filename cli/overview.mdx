@@ -1,0 +1,202 @@
+---
+title: CLI Overview
+description: NetBird command-line interface reference
+---
+
+The NetBird CLI provides a powerful command-line interface for managing your NetBird network connections, peers, and services.
+
+## Installation
+
+The `netbird` CLI is automatically installed with the NetBird client. See the [installation guide](/installation) for platform-specific instructions.
+
+## Basic Usage
+
+```bash
+netbird [command] [flags]
+```
+
+## Available Commands
+
+- `netbird up` - Connect to the NetBird network
+- `netbird down` - Disconnect from the NetBird network
+- `netbird status` - Display connection status and peer information
+- `netbird login` - Authenticate with the management server
+- `netbird logout` - Log out from the NetBird network
+- `netbird service` - Manage the NetBird daemon service
+- `netbird networks` (alias: `routes`) - Manage network routes and resources
+- `netbird ssh` - Connect to NetBird peers via SSH
+- `netbird version` - Display version information
+
+## Global Flags
+
+These flags can be used with any command:
+
+<ParamField path="--daemon-addr" type="string" default="unix:///var/run/netbird.sock (Linux/macOS), tcp://127.0.0.1:41731 (Windows)">
+  Daemon service address for CLI requests. Format: `[unix|tcp]://[path|host:port]`
+</ParamField>
+
+<ParamField path="--management-url" type="string" default="https://api.netbird.io">
+  Management Service URL. Format: `[http|https]://[host]:[port]`
+  
+  Short form: `-m`
+</ParamField>
+
+<ParamField path="--admin-url" type="string" default="https://app.netbird.io">
+  Admin Panel URL. Format: `[http|https]://[host]:[port]`
+</ParamField>
+
+<ParamField path="--log-level" type="string" default="info">
+  Sets NetBird log level. Options: `trace`, `debug`, `info`, `warn`, `error`
+  
+  Short form: `-l`
+</ParamField>
+
+<ParamField path="--log-file" type="string" default="/var/log/netbird/client.log">
+  Sets NetBird log file paths. Can be specified multiple times or as comma-separated list.
+  
+  Special values:
+  - `console` - Output to stdout
+  - `syslog` - Send to syslog daemon
+</ParamField>
+
+<ParamField path="--setup-key" type="string">
+  Setup key obtained from the Management Service Dashboard (used to register peer)
+  
+  Short form: `-k`
+</ParamField>
+
+<ParamField path="--setup-key-file" type="string">
+  Path to a file containing the setup key. Ignored if `--setup-key` is provided.
+</ParamField>
+
+<ParamField path="--hostname" type="string">
+  Sets a custom hostname for the device
+  
+  Short form: `-n`
+</ParamField>
+
+<ParamField path="--preshared-key" type="string">
+  Sets WireGuard PreSharedKey property. If set, only peers with the same key can communicate.
+</ParamField>
+
+<ParamField path="--anonymize" type="boolean" default="false">
+  Anonymize IP addresses and non-netbird.io domains in logs and status output
+  
+  Short form: `-A`
+</ParamField>
+
+<ParamField path="--config" type="string" default="/etc/netbird/config.json">
+  Overrides the default profile file location
+  
+  Short form: `-c`
+  
+  Default paths:
+  - Linux/FreeBSD: `/etc/netbird/config.json`
+  - macOS: `/etc/netbird/config.json`
+  - Windows: `%PROGRAMDATA%\Netbird\config.json`
+</ParamField>
+
+<ParamField path="--service" type="string" default="netbird (Windows: Netbird)">
+  NetBird system service name
+  
+  Short form: `-s`
+</ParamField>
+
+## Environment Variables
+
+All flags can be set via environment variables using the `NB_` or `WT_` prefix (for backwards compatibility):
+
+- Flag names are converted to uppercase
+- Dashes are replaced with underscores
+- Prefixed with `NB_` or `WT_`
+
+**Examples:**
+
+```bash
+# Set management URL
+export NB_MANAGEMENT_URL="https://management.example.com"
+
+# Set log level
+export NB_LOG_LEVEL="debug"
+
+# Set setup key
+export NB_SETUP_KEY="your-setup-key-here"
+
+# Disable browser for SSO
+export NB_NO_BROWSER=true
+```
+
+## Configuration File
+
+The NetBird configuration file is stored at:
+
+- **Linux/FreeBSD**: `/etc/netbird/config.json`
+- **macOS**: `/etc/netbird/config.json`
+- **Windows**: `%PROGRAMDATA%\Netbird\config.json`
+
+This file contains:
+- Management server URL
+- Private key
+- WireGuard interface configuration
+- Network settings
+- SSH settings
+
+<Warning>
+  The configuration file contains sensitive information including your private key. Ensure proper file permissions are set.
+</Warning>
+
+## Daemon Socket
+
+The NetBird CLI communicates with the NetBird daemon service via:
+
+- **Linux/macOS**: Unix socket at `/var/run/netbird.sock`
+- **Windows**: TCP socket at `127.0.0.1:41731`
+
+Most commands require the daemon to be running:
+
+```bash
+netbird service install
+netbird service start
+```
+
+## Exit Codes
+
+- `0` - Success
+- `1` - General error
+- Non-zero - Command-specific error
+
+## Getting Help
+
+Get help for any command:
+
+```bash
+netbird --help
+netbird [command] --help
+```
+
+## Examples
+
+**Connect to NetBird network:**
+```bash
+netbird up
+```
+
+**Connect with a setup key:**
+```bash
+netbird up --setup-key YOUR_SETUP_KEY
+```
+
+**Check connection status:**
+```bash
+netbird status
+```
+
+**View detailed status:**
+```bash
+netbird status --detail
+```
+
+**Disconnect from network:**
+```bash
+netbird down
+```

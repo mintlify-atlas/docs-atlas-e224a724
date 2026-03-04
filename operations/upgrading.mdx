@@ -1,0 +1,604 @@
+---
+title: Upgrading
+description: Upgrade NetBird clients and servers with minimal downtime
+---
+
+This guide covers upgrading NetBird components across different deployment scenarios.
+
+## Version Compatibility
+
+<Info>
+NetBird maintains backward compatibility. Newer servers work with older clients, but using the latest versions on both sides is recommended.
+</Info>
+
+### Compatibility Matrix
+
+- **Management Server:** Can manage clients from the last 3 major versions
+- **Signal Server:** Compatible with all client versions from the same major release
+- **Relay Server:** Compatible with all client versions from the same major release
+- **Clients:** Can connect to management servers from the same major version
+
+<Warning>
+Always upgrade server components before upgrading clients to ensure compatibility.
+</Warning>
+
+## Upgrade Order
+
+<Steps>
+  <Step title="Upgrade Management Server">
+    The management server should be upgraded first as it maintains compatibility with older clients.
+  </Step>
+  
+  <Step title="Upgrade Signal Server">
+    Signal servers can be upgraded while clients are connected with minimal disruption.
+  </Step>
+  
+  <Step title="Upgrade Relay Server">
+    Relay servers can be upgraded independently. Active relay connections will reconnect automatically.
+  </Step>
+  
+  <Step title="Upgrade Clients">
+    Clients can be upgraded in batches or all at once after servers are upgraded.
+  </Step>
+</Steps>
+
+## Checking Versions
+
+### Client Version
+
+```bash
+netbird version
+```
+
+Output:
+```
+NetBird version: 0.28.0
+UI version: 0.28.0
+```
+
+### Server Versions
+
+<Accordion title="Docker Compose">
+```bash
+# Check running versions
+docker compose ps
+
+# Check image tags
+docker compose images
+
+# View specific service version
+docker exec netbird-management netbird-mgmt --version
+```
+</Accordion>
+
+<Accordion title="Kubernetes">
+```bash
+# Get deployed versions
+kubectl get pods -n netbird -o jsonpath='{.items[*].spec.containers[*].image}'
+
+# Check specific deployment
+kubectl describe deployment netbird-management -n netbird
+```
+</Accordion>
+
+## Upgrading Servers
+
+### Docker Compose Upgrade
+
+This is the most common self-hosted deployment method.
+
+<Steps>
+  <Step title="Backup configuration and data">
+    ```bash
+    # Backup volumes
+    docker compose stop
+    
+    # Backup management data
+    sudo tar -czf netbird-backup-$(date +%Y%m%d).tar.gz \
+      /var/lib/docker/volumes/netbird_mgmt_data \
+      /var/lib/docker/volumes/netbird_signal_data \
+      ./management.json
+    
+    # Verify backup
+    ls -lh netbird-backup-*.tar.gz
+    ```
+  </Step>
+  
+  <Step title="Update docker-compose.yml">
+    ```bash
+    # Edit docker-compose.yml or .env file
+    vim docker-compose.yml
+    
+    # Update image tags
+    # FROM:
+    #   image: netbirdio/management:0.27.0
+    # TO:
+    #   image: netbirdio/management:0.28.0
+    
+    # Or use 'latest' tag for automatic updates
+    # image: netbirdio/management:latest
+    ```
+  </Step>
+  
+  <Step title="Pull new images">
+    ```bash
+    docker compose pull
+    ```
+  </Step>
+  
+  <Step title="Restart services">
+    ```bash
+    # Graceful restart (minimal downtime)
+    docker compose up -d
+    
+    # Or restart specific services
+    docker compose up -d management
+    docker compose up -d signal
+    docker compose up -d relay
+    ```
+  </Step>
+  
+  <Step title="Verify upgrade">
+    ```bash
+    # Check service status
+    docker compose ps
+    
+    # Check logs for errors
+    docker compose logs management --tail=50
+    docker compose logs signal --tail=50
+    docker compose logs relay --tail=50
+    
+    # Test API
+    curl -k https://localhost:443/api/peers
+    
+    # Check metrics
+    curl http://localhost:9090/metrics | grep management_grpc_connected_streams
+    ```
+  </Step>
+</Steps>
+
+### Environment Variables Upgrade
+
+Alternatively, manage versions via environment variables:
+
+```bash
+# .env file
+NETBIRD_MANAGEMENT_TAG=0.28.0
+NETBIRD_SIGNAL_TAG=0.28.0
+NETBIRD_RELAY_TAG=0.28.0
+NETBIRD_DASHBOARD_TAG=2.5.0
+```
+
+Then upgrade:
+
+```bash
+# Update tags in .env
+vim .env
+
+# Pull and restart
+docker compose pull
+docker compose up -d
+```
+
+### Kubernetes Upgrade
+
+<Accordion title="Using Helm">
+```bash
+# Update Helm repository
+helm repo update netbird
+
+# Check available versions
+helm search repo netbird --versions
+
+# Upgrade to specific version
+helm upgrade netbird netbird/netbird \
+  --version 0.28.0 \
+  --namespace netbird \
+  --reuse-values
+
+# Or upgrade to latest
+helm upgrade netbird netbird/netbird \
+  --namespace netbird \
+  --reuse-values
+
+# Check rollout status
+kubectl rollout status deployment/netbird-management -n netbird
+```
+</Accordion>
+
+<Accordion title="Using kubectl">
+```bash
+# Update image in deployment
+kubectl set image deployment/netbird-management \
+  management=netbirdio/management:0.28.0 \
+  -n netbird
+
+# Watch rollout
+kubectl rollout status deployment/netbird-management -n netbird
+
+# Verify
+kubectl get pods -n netbird
+kubectl logs -n netbird deployment/netbird-management --tail=50
+```
+</Accordion>
+
+### Rolling Back Servers
+
+If issues occur after upgrade:
+
+<Steps>
+  <Step title="Docker Compose Rollback">
+    ```bash
+    # Stop services
+    docker compose down
+    
+    # Edit docker-compose.yml to previous version
+    vim docker-compose.yml
+    
+    # Restore from backup if needed
+    sudo tar -xzf netbird-backup-20260304.tar.gz -C /
+    
+    # Start with old version
+    docker compose up -d
+    ```
+  </Step>
+  
+  <Step title="Kubernetes Rollback">
+    ```bash
+    # Rollback deployment
+    kubectl rollout undo deployment/netbird-management -n netbird
+    
+    # Or rollback to specific revision
+    kubectl rollout history deployment/netbird-management -n netbird
+    kubectl rollout undo deployment/netbird-management --to-revision=2 -n netbird
+    ```
+  </Step>
+</Steps>
+
+## Upgrading Clients
+
+### Linux Client
+
+<Accordion title="Debian/Ubuntu (APT)">
+```bash
+# Update package list
+sudo apt update
+
+# Upgrade NetBird
+sudo apt upgrade netbird
+
+# Or install specific version
+sudo apt install netbird=0.28.0
+
+# Restart service
+sudo systemctl restart netbird
+
+# Verify version
+netbird version
+```
+</Accordion>
+
+<Accordion title="RHEL/CentOS (YUM/DNF)">
+```bash
+# Update NetBird
+sudo yum update netbird
+# or
+sudo dnf update netbird
+
+# Restart service
+sudo systemctl restart netbird
+
+# Verify
+netbird version
+```
+</Accordion>
+
+<Accordion title="Using Install Script">
+```bash
+# Download and run install script (auto-detects latest version)
+curl -fsSL https://pkgs.netbird.io/install.sh | sh
+
+# Restart service
+sudo systemctl restart netbird
+```
+</Accordion>
+
+<Accordion title="Manual Binary Upgrade">
+```bash
+# Download new version
+wget https://github.com/netbirdio/netbird/releases/download/v0.28.0/netbird_0.28.0_linux_amd64.tar.gz
+
+# Extract
+tar -xzf netbird_0.28.0_linux_amd64.tar.gz
+
+# Stop service
+sudo systemctl stop netbird
+
+# Replace binary
+sudo mv netbird /usr/bin/netbird
+sudo chmod +x /usr/bin/netbird
+
+# Start service
+sudo systemctl start netbird
+```
+</Accordion>
+
+### Windows Client
+
+<Accordion title="Using MSI Installer">
+1. Download latest MSI from [GitHub Releases](https://github.com/netbirdio/netbird/releases)
+2. Run the installer
+3. Choose "Upgrade" when prompted
+4. Service restarts automatically
+5. Verify in system tray or:
+   ```powershell
+   netbird version
+   ```
+</Accordion>
+
+<Accordion title="Silent Upgrade (Automation)">
+```powershell
+# Download MSI
+Invoke-WebRequest -Uri "https://github.com/netbirdio/netbird/releases/download/v0.28.0/netbird_installer_0.28.0_windows_amd64.msi" -OutFile "netbird_installer.msi"
+
+# Silent install/upgrade
+msiexec /i netbird_installer.msi /qn /l*v upgrade.log
+
+# Wait for installation
+Start-Sleep -Seconds 10
+
+# Verify
+netbird version
+```
+</Accordion>
+
+### macOS Client
+
+<Accordion title="Using PKG Installer">
+1. Download latest PKG from [GitHub Releases](https://github.com/netbirdio/netbird/releases)
+2. Run the installer
+3. Service restarts automatically
+4. Verify:
+   ```bash
+   netbird version
+   ```
+</Accordion>
+
+<Accordion title="Using Homebrew">
+```bash
+# Update Homebrew
+brew update
+
+# Upgrade NetBird
+brew upgrade netbird
+
+# Restart service
+sudo launchctl unload /Library/LaunchDaemons/io.netbird.client.plist
+sudo launchctl load /Library/LaunchDaemons/io.netbird.client.plist
+
+# Verify
+netbird version
+```
+</Accordion>
+
+### Client Upgrade Validation
+
+After upgrading clients:
+
+```bash
+# Check connection status
+netbird status
+
+# Verify peer connectivity
+netbird status --detail
+
+# Test connectivity to peers
+ping 100.64.0.5  # Use actual peer IP
+
+# Check service is running
+sudo systemctl status netbird  # Linux
+Get-Service Netbird  # Windows PowerShell
+```
+
+## Automated Client Upgrades
+
+### Fleet Management
+
+<Accordion title="Ansible Playbook">
+```yaml
+# netbird-upgrade.yml
+---
+- name: Upgrade NetBird clients
+  hosts: netbird_clients
+  become: yes
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Upgrade NetBird
+      package:
+        name: netbird
+        state: latest
+
+    - name: Restart NetBird service
+      systemd:
+        name: netbird
+        state: restarted
+
+    - name: Verify version
+      command: netbird version
+      register: version_output
+
+    - debug:
+        var: version_output.stdout
+```
+
+Run:
+```bash
+ansible-playbook netbird-upgrade.yml
+```
+</Accordion>
+
+<Accordion title="Batch Script (Windows)">
+```batch
+@echo off
+REM upgrade-netbird.bat
+
+set VERSION=0.28.0
+set MSI_URL=https://github.com/netbirdio/netbird/releases/download/v%VERSION%/netbird_installer_%VERSION%_windows_amd64.msi
+
+echo Downloading NetBird %VERSION%...
+powershell -Command "Invoke-WebRequest -Uri '%MSI_URL%' -OutFile 'netbird_installer.msi'"
+
+echo Installing...
+msiexec /i netbird_installer.msi /qn /l*v upgrade.log
+
+echo Waiting for installation...
+timeout /t 15 /nobreak
+
+echo Verifying installation...
+netbird version
+
+del netbird_installer.msi
+echo Upgrade complete!
+```
+</Accordion>
+
+## Migration Scenarios
+
+### Migrating from SQLite to PostgreSQL
+
+<Warning>
+This requires downtime. Schedule during maintenance window.
+</Warning>
+
+<Steps>
+  <Step title="Backup existing data">
+    ```bash
+    docker compose stop management
+    
+    # Backup SQLite database
+    docker cp netbird-management:/var/lib/netbird/store.db ./store.db.backup
+    ```
+  </Step>
+  
+  <Step title="Setup PostgreSQL">
+    ```yaml
+    # Add to docker-compose.yml
+    postgres:
+      image: postgres:15
+      environment:
+        POSTGRES_DB: netbird
+        POSTGRES_USER: netbird
+        POSTGRES_PASSWORD: secure_password
+      volumes:
+        - postgres-data:/var/lib/postgresql/data
+    ```
+  </Step>
+  
+  <Step title="Update management configuration">
+    ```yaml
+    management:
+      environment:
+        - NETBIRD_STORE_ENGINE_POSTGRES_DSN=postgres://netbird:secure_password@postgres:5432/netbird?sslmode=disable
+    ```
+  </Step>
+  
+  <Step title="Start with new database">
+    ```bash
+    # Remove old SQLite volume
+    docker compose down
+    docker volume rm netbird_mgmt_data
+    
+    # Start with PostgreSQL
+    docker compose up -d
+    ```
+  </Step>
+  
+  <Step title="Re-register peers">
+    Existing peers will need to re-authenticate after database migration.
+  </Step>
+</Steps>
+
+## Breaking Changes
+
+Check release notes for breaking changes before upgrading:
+
+- Configuration file format changes
+- API endpoint modifications
+- Deprecated feature removals
+- Database schema changes
+
+<Info>
+Always review the [release notes](https://github.com/netbirdio/netbird/releases) before upgrading.
+</Info>
+
+## Zero-Downtime Upgrades
+
+For production environments:
+
+### Server High Availability
+
+<Steps>
+  <Step title="Deploy multiple management servers">
+    Use load balancer to distribute traffic across multiple management instances.
+  </Step>
+  
+  <Step title="Rolling upgrade">
+    ```bash
+    # Upgrade one instance at a time
+    docker compose stop management-1
+    # Update version
+    docker compose up -d management-1
+    # Wait for health check
+    # Repeat for management-2, management-3, etc.
+    ```
+  </Step>
+  
+  <Step title="Monitor during upgrade">
+    ```bash
+    # Watch metrics
+    watch -n 2 'curl -s http://localhost:9090/metrics | grep connected_streams'
+    
+    # Monitor logs
+    docker compose logs -f management
+    ```
+  </Step>
+</Steps>
+
+## Post-Upgrade Checklist
+
+<Steps>
+  <Step title="Verify all services are running">
+    ```bash
+    docker compose ps
+    netbird status
+    ```
+  </Step>
+  
+  <Step title="Check metrics and monitoring">
+    ```bash
+    curl http://localhost:9090/metrics
+    ```
+  </Step>
+  
+  <Step title="Test peer connectivity">
+    ```bash
+    netbird status --detail
+    ping 100.64.0.5  # Test peer
+    ```
+  </Step>
+  
+  <Step title="Review logs for errors">
+    ```bash
+    docker compose logs --tail=100 management
+    grep -i error /var/log/netbird/client.log
+    ```
+  </Step>
+  
+  <Step title="Update documentation">
+    Document the new version and any configuration changes made.
+  </Step>
+</Steps>

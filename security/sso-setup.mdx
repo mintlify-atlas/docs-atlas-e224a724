@@ -1,0 +1,384 @@
+---
+title: SSO Setup
+description: Configure Single Sign-On with supported identity providers
+---
+
+NetBird supports integration with multiple identity providers (IdPs) to enable Single Sign-On (SSO) authentication for your network. SSO allows users to authenticate once and access all connected resources securely.
+
+## Supported Identity Providers
+
+NetBird integrates with the following identity providers:
+
+<CardGroup cols={2}>
+  <Card title="Auth0" icon="lock">
+    Enterprise-grade authentication platform
+  </Card>
+  <Card title="Azure AD" icon="microsoft">
+    Microsoft Azure Active Directory
+  </Card>
+  <Card title="Okta" icon="circle-check">
+    Enterprise identity management
+  </Card>
+  <Card title="Keycloak" icon="key">
+    Open-source identity and access management
+  </Card>
+  <Card title="Google Workspace" icon="google">
+    Google's enterprise identity platform
+  </Card>
+  <Card title="JumpCloud" icon="cloud">
+    Cloud directory platform
+  </Card>
+  <Card title="Zitadel" icon="shield">
+    Cloud-native identity management
+  </Card>
+  <Card title="Authentik" icon="fingerprint">
+    Open-source identity provider
+  </Card>
+  <Card title="Dex" icon="server">
+    OpenID Connect identity provider
+  </Card>
+</CardGroup>
+
+## Configuration Overview
+
+Each identity provider requires specific configuration parameters. The general setup process involves:
+
+<Steps>
+  <Step title="Register NetBird Application">
+    Create an application in your IdP's admin console and obtain client credentials.
+  </Step>
+  
+  <Step title="Configure Management Server">
+    Add the IdP configuration to your NetBird management server settings.
+  </Step>
+  
+  <Step title="Set Callback URLs">
+    Configure OAuth callback URLs in your IdP to point to your NetBird instance.
+  </Step>
+  
+  <Step title="Test Authentication">
+    Verify users can successfully authenticate through the SSO flow.
+  </Step>
+</Steps>
+
+## Auth0 Configuration
+
+Auth0 integration requires the following configuration:
+
+### Required Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `Audience` | Auth0 API audience identifier |
+| `AuthIssuer` | Auth0 domain (e.g., `https://your-tenant.auth0.com`) |
+| `ClientID` | Application client ID from Auth0 |
+| `ClientSecret` | Application client secret from Auth0 |
+| `GrantType` | OAuth2 grant type (typically `client_credentials`) |
+
+### Example Configuration
+
+```json
+{
+  "ManagerType": "auth0",
+  "Auth0ClientCredentials": {
+    "Audience": "https://api.netbird.io",
+    "AuthIssuer": "https://your-tenant.auth0.com",
+    "ClientID": "your-client-id",
+    "ClientSecret": "your-client-secret",
+    "GrantType": "client_credentials"
+  }
+}
+```
+
+<Info>
+Auth0 supports user creation, deletion, and app metadata updates through the Management API.
+</Info>
+
+## Azure AD Configuration
+
+Microsoft Azure Active Directory integration parameters:
+
+### Required Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `ClientID` | Azure AD application client ID |
+| `ClientSecret` | Application client secret |
+| `TenantID` | Azure AD tenant ID |
+| `TokenEndpoint` | OAuth token endpoint URL |
+| `GraphAPIEndpoint` | Microsoft Graph API endpoint |
+| `ObjectID` | Azure AD object ID |
+
+### Example Configuration
+
+```json
+{
+  "ManagerType": "azure",
+  "AzureClientCredentials": {
+    "ClientID": "your-client-id",
+    "ClientSecret": "your-client-secret",
+    "TokenEndpoint": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
+    "GraphAPIEndpoint": "https://graph.microsoft.com/v1.0",
+    "ObjectID": "your-object-id"
+  }
+}
+```
+
+## Okta Configuration
+
+Okta integration using API tokens:
+
+### Required Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `Issuer` | Okta domain (e.g., `https://your-org.okta.com`) |
+| `ApiToken` | Okta API token for management operations |
+| `TokenEndpoint` | OAuth token endpoint |
+| `GrantType` | OAuth2 grant type |
+
+### Example Configuration
+
+```json
+{
+  "ManagerType": "okta",
+  "ClientConfig": {
+    "Issuer": "https://your-org.okta.com",
+    "TokenEndpoint": "https://your-org.okta.com/oauth2/v1/token",
+    "GrantType": "client_credentials"
+  },
+  "ExtraConfig": {
+    "ApiToken": "your-api-token"
+  }
+}
+```
+
+## Keycloak Configuration
+
+Keycloak open-source IdP integration:
+
+### Required Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `ClientID` | Keycloak client ID |
+| `ClientSecret` | Client secret |
+| `TokenEndpoint` | Token endpoint URL |
+| `AdminEndpoint` | Keycloak admin API endpoint |
+| `GrantType` | OAuth2 grant type |
+
+### Example Configuration
+
+```json
+{
+  "ManagerType": "keycloak",
+  "KeycloakClientCredentials": {
+    "ClientID": "netbird",
+    "ClientSecret": "your-client-secret",
+    "TokenEndpoint": "https://keycloak.example.com/realms/master/protocol/openid-connect/token",
+    "AdminEndpoint": "https://keycloak.example.com/admin/realms/master",
+    "GrantType": "client_credentials"
+  }
+}
+```
+
+## Google Workspace Configuration
+
+Google Workspace integration using service accounts:
+
+### Required Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `ServiceAccountKey` | Base64-encoded service account key JSON |
+| `CustomerID` | Google Workspace customer ID |
+
+### Setup Steps
+
+<Steps>
+  <Step title="Create Service Account">
+    Create a service account in Google Cloud Console with Directory API access.
+  </Step>
+  
+  <Step title="Enable Domain-Wide Delegation">
+    Enable domain-wide delegation for the service account.
+  </Step>
+  
+  <Step title="Download Key">
+    Download the service account key JSON and base64-encode it.
+  </Step>
+  
+  <Step title="Configure NetBird">
+    Add the configuration to your management server.
+  </Step>
+</Steps>
+
+### Example Configuration
+
+```json
+{
+  "ManagerType": "google",
+  "ExtraConfig": {
+    "ServiceAccountKey": "base64-encoded-key-json",
+    "CustomerId": "C01234567"
+  }
+}
+```
+
+## Additional IdP Options
+
+### JumpCloud
+
+Cloud directory platform requiring only an API token:
+
+```json
+{
+  "ManagerType": "jumpcloud",
+  "ExtraConfig": {
+    "ApiToken": "your-api-token"
+  }
+}
+```
+
+### Zitadel
+
+Cloud-native identity management:
+
+```json
+{
+  "ManagerType": "zitadel",
+  "ZitadelClientCredentials": {
+    "ClientID": "your-client-id",
+    "ClientSecret": "your-client-secret",
+    "TokenEndpoint": "https://zitadel.example.com/oauth/v2/token",
+    "ManagementEndpoint": "https://zitadel.example.com/management/v1"
+  }
+}
+```
+
+### Authentik
+
+Open-source identity provider with username/password authentication:
+
+```json
+{
+  "ManagerType": "authentik",
+  "ClientConfig": {
+    "Issuer": "https://authentik.example.com",
+    "ClientID": "netbird",
+    "TokenEndpoint": "https://authentik.example.com/application/o/token/"
+  },
+  "ExtraConfig": {
+    "Username": "admin",
+    "Password": "your-password"
+  }
+}
+```
+
+### Dex
+
+OpenID Connect provider with gRPC API for user management:
+
+```json
+{
+  "ManagerType": "dex",
+  "ClientConfig": {
+    "Issuer": "https://dex.example.com/dex"
+  },
+  "ExtraConfig": {
+    "GRPCAddr": "dex.example.com:5557"
+  }
+}
+```
+
+<Info>
+Dex uses a gRPC API for managing users in the password database and supports OpenID Connect for authentication.
+</Info>
+
+## User Management
+
+Depending on your IdP, NetBird supports various user management operations:
+
+| Operation | Auth0 | Azure AD | Okta | Keycloak | Google | JumpCloud | Zitadel | Authentik | Dex |
+|-----------|-------|----------|------|----------|--------|-----------|---------|-----------|-----|
+| Get user by email | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Get user by ID | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Create user | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Delete user | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Update metadata | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| Send invite | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+
+## Disabling Local Authentication
+
+When using an external IdP, you can disable local email/password authentication:
+
+```json
+{
+  "LocalAuthDisabled": true
+}
+```
+
+<Warning>
+Ensure at least one external identity provider is configured before disabling local authentication to prevent account lockout.
+</Warning>
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="Authentication Fails with 401 Error">
+    - Verify client credentials are correct
+    - Check that the token endpoint URL is accessible
+    - Ensure grant type matches your IdP configuration
+    - Validate that API tokens haven't expired
+  </Accordion>
+  
+  <Accordion title="Users Not Syncing">
+    - Confirm the management API has proper permissions
+    - Check network connectivity to IdP endpoints
+    - Review management server logs for detailed error messages
+    - Verify user query filters and scopes
+  </Accordion>
+  
+  <Accordion title="Callback URL Mismatch">
+    - Ensure redirect URIs are registered in your IdP
+    - Check that the callback URL matches exactly (including protocol and port)
+    - Verify HTTPS is used for production environments
+  </Accordion>
+</AccordionGroup>
+
+## Security Best Practices
+
+<Steps>
+  <Step title="Use Strong Credentials">
+    Generate strong client secrets and rotate them regularly.
+  </Step>
+  
+  <Step title="Restrict Permissions">
+    Grant only necessary permissions to NetBird service accounts.
+  </Step>
+  
+  <Step title="Enable HTTPS">
+    Always use HTTPS for production IdP endpoints and callbacks.
+  </Step>
+  
+  <Step title="Monitor Access">
+    Enable audit logging in your IdP to track authentication events.
+  </Step>
+  
+  <Step title="Implement MFA">
+    Enable multi-factor authentication in your IdP for enhanced security.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="MFA Configuration" icon="shield-check" href="/security/mfa">
+    Configure multi-factor authentication
+  </Card>
+  <Card title="Posture Checks" icon="clipboard-check" href="/security/posture-checks">
+    Set up device posture checks
+  </Card>
+</CardGroup>

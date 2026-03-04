@@ -1,0 +1,451 @@
+---
+title: Linux Client
+description: Install and configure NetBird on Linux systems
+---
+
+The NetBird client for Linux provides secure mesh networking capabilities through WireGuard. Multiple installation methods are available to suit different Linux distributions and preferences.
+
+## Installation
+
+<Tabs>
+  <Tab title="Install Script">
+    The easiest way to install NetBird on Linux is using the official installation script:
+
+    ```bash
+    curl -fsSL https://pkgs.netbird.io/install.sh | sh
+    ```
+
+    This script automatically:
+    - Detects your Linux distribution
+    - Installs from the appropriate package manager (apt, dnf, yum, or rpm-ostree)
+    - Sets up the NetBird service
+    - Starts the daemon automatically
+
+    <Note>
+      The install script requires `curl` and `sudo` (or `doas`) to be installed on your system.
+    </Note>
+  </Tab>
+
+  <Tab title="Debian/Ubuntu (APT)">
+    For Debian-based distributions, you can manually add the NetBird repository:
+
+    <Steps>
+      <Step title="Add the NetBird repository">
+        ```bash
+        sudo apt-get update
+        sudo apt-get install ca-certificates curl gnupg -y
+
+        curl -sSL https://pkgs.netbird.io/debian/public.key | sudo gpg --dearmor -o /usr/share/keyrings/netbird-archive-keyring.gpg
+
+        echo 'deb [signed-by=/usr/share/keyrings/netbird-archive-keyring.gpg] https://pkgs.netbird.io/debian stable main' | sudo tee /etc/apt/sources.list.d/netbird.list
+        ```
+      </Step>
+
+      <Step title="Install NetBird">
+        ```bash
+        sudo apt-get update
+        sudo apt-get install netbird -y
+        ```
+
+        For desktop environments, also install the UI:
+        ```bash
+        sudo apt-get install netbird-ui -y
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="RHEL/Fedora/CentOS (DNF/YUM)">
+    For Red Hat-based distributions:
+
+    <Steps>
+      <Step title="Add the NetBird repository">
+        ```bash
+        sudo tee /etc/yum.repos.d/netbird.repo <<EOF
+[NetBird]
+name=NetBird
+baseurl=https://pkgs.netbird.io/yum/
+enabled=1
+gpgcheck=0
+gpgkey=https://pkgs.netbird.io/yum/repodata/repomd.xml.key
+repo_gpgcheck=1
+EOF
+        ```
+      </Step>
+
+      <Step title="Install NetBird">
+        For Fedora (using DNF):
+        ```bash
+        sudo dnf -y install netbird
+        sudo dnf -y install netbird-ui  # Optional: for desktop environments
+        ```
+
+        For CentOS/RHEL (using YUM):
+        ```bash
+        sudo yum -y install netbird
+        sudo yum -y install netbird-ui  # Optional: for desktop environments
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Binary Installation">
+    Install NetBird using pre-compiled binaries:
+
+    ```bash
+    export USE_BIN_INSTALL=true
+    curl -fsSL https://pkgs.netbird.io/install.sh | sh
+    ```
+
+    This installs NetBird to `/usr/bin` without using a package manager.
+  </Tab>
+
+  <Tab title="NixOS">
+    For NixOS users, add NetBird to your `configuration.nix`:
+
+    ```nix
+    services.netbird.enable = true;
+    ```
+
+    For the UI (optional):
+    ```nix
+    environment.systemPackages = [ pkgs.netbird-ui ];
+    ```
+
+    Then rebuild your system:
+    ```bash
+    sudo nixos-rebuild switch
+    ```
+  </Tab>
+</Tabs>
+
+## Initial Setup
+
+After installation, connect to your NetBird network:
+
+<Steps>
+  <Step title="Start the NetBird service">
+    The service should start automatically after installation. If not:
+
+    ```bash
+    netbird service install
+    netbird service start
+    ```
+  </Step>
+
+  <Step title="Connect to NetBird">
+    **Using SSO (Interactive Login):**
+    ```bash
+    netbird up
+    ```
+
+    **Using a Setup Key:**
+    ```bash
+    netbird up --setup-key <YOUR_SETUP_KEY>
+    ```
+
+    **For self-hosted installations:**
+    ```bash
+    netbird up --management-url https://your-management-url.com --setup-key <YOUR_SETUP_KEY>
+    ```
+  </Step>
+
+  <Step title="Verify connection">
+    Check your NetBird status:
+
+    ```bash
+    netbird status
+    ```
+
+    You should see:
+    ```
+    Daemon status: Connected
+    Management: Connected
+    Signal: Connected
+    NetBird IP: 100.x.x.x/16
+    ```
+  </Step>
+</Steps>
+
+## Service Management
+
+NetBird runs as a systemd service on Linux. Manage it using the `netbird service` command:
+
+```bash
+# Check service status
+netbird service status
+
+# Start the service
+netbird service start
+
+# Stop the service
+netbird service stop
+
+# Restart the service
+netbird service restart
+
+# Uninstall the service
+netbird service uninstall
+```
+
+Or use systemd directly:
+
+```bash
+# Check status
+sudo systemctl status netbird
+
+# Enable auto-start on boot
+sudo systemctl enable netbird
+
+# View logs
+sudo journalctl -u netbird -f
+```
+
+## Configuration
+
+### Config File Location
+
+The NetBird configuration file is located at:
+- **Standard:** `/etc/netbird/config.json`
+- **FreeBSD:** `/var/db/netbird/config.json`
+
+### Log Files
+
+Logs are written to `/var/log/netbird/client.log` by default.
+
+View logs in real-time:
+```bash
+tail -f /var/log/netbird/client.log
+```
+
+### Environment Variables
+
+NetBird supports configuration through environment variables with the `NB_` prefix. Common examples:
+
+| Variable | Description | Example |
+|----------|-------------|--------|
+| `NB_MANAGEMENT_URL` | Management server URL | `https://api.netbird.io` |
+| `NB_LOG_LEVEL` | Logging level | `info`, `debug`, `error` |
+| `NB_LOG_FILE` | Log file path | `/var/log/netbird/client.log` |
+| `NB_INTERFACE_NAME` | WireGuard interface name | `wt0` |
+| `NB_WIREGUARD_PORT` | WireGuard listening port | `51820` |
+| `NB_CONFIG` | Config file path | `/etc/netbird/config.json` |
+
+Set service environment variables:
+```bash
+netbird service install --service-env="NB_LOG_LEVEL=debug,NB_WIREGUARD_PORT=51820"
+```
+
+### Command-Line Options
+
+Key CLI flags for `netbird up`:
+
+```bash
+# Set custom WireGuard interface name
+netbird up --interface-name wt0
+
+# Set custom WireGuard port
+netbird up --wireguard-port 51820
+
+# Set custom MTU
+netbird up --mtu 1280
+
+# Set custom hostname
+netbird up --hostname my-linux-server
+
+# Disable auto-connect on service start
+netbird up --disable-auto-connect
+
+# Enable Rosenpass (post-quantum security)
+netbird up --enable-rosenpass
+
+# Set custom DNS resolver address
+netbird up --dns-resolver-address 127.0.0.1:5053
+
+# Add extra DNS labels
+netbird up --extra-dns-labels vpc1,prod
+```
+
+## Advanced Configuration
+
+### Running in Foreground Mode
+
+For debugging or testing without the daemon:
+
+```bash
+netbird up --foreground-mode
+```
+
+### Custom External IP Mapping
+
+For machines behind NAT or with multiple interfaces:
+
+```bash
+# Map external IP to local IP
+netbird up --external-ip-map 203.0.113.5/192.168.1.10
+
+# Map external IP to interface
+netbird up --external-ip-map 203.0.113.5/eth0
+
+# Multiple mappings
+netbird up --external-ip-map 203.0.113.5,203.0.113.6/192.168.1.10
+```
+
+### Network Monitor
+
+Control network change detection:
+
+```bash
+# Enable network monitoring (default on some distros)
+netbird up --network-monitor=true
+
+# Disable network monitoring
+netbird up --network-monitor=false
+```
+
+### Headless Servers
+
+For servers without a desktop environment, use setup keys for authentication:
+
+```bash
+netbird up --setup-key <YOUR_SETUP_KEY>
+```
+
+<Note>
+  The NetBird UI is automatically skipped during installation on systems without `XDG_CURRENT_DESKTOP` or `DESKTOP_SESSION` environment variables.
+</Note>
+
+## Troubleshooting
+
+### Check Connection Status
+
+```bash
+# Basic status
+netbird status
+
+# Detailed status with peer information
+netbird status --detail
+
+# JSON output for parsing
+netbird status --json
+```
+
+### View Only Your NetBird IP
+
+```bash
+netbird status --ipv4
+```
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="Service won't start">
+    Check if the service is properly installed:
+    ```bash
+    netbird service status
+    ```
+
+    Reinstall the service:
+    ```bash
+    netbird service uninstall
+    netbird service install
+    netbird service start
+    ```
+  </Accordion>
+
+  <Accordion title="Connection timeout">
+    Ensure UDP port 3478 is open for STUN/TURN connectivity:
+    ```bash
+    sudo ufw allow 3478/udp
+    ```
+
+    Check if the WireGuard module is loaded:
+    ```bash
+    lsmod | grep wireguard
+    ```
+  </Accordion>
+
+  <Accordion title="TUN device errors">
+    Ensure the TUN module is loaded:
+    ```bash
+    sudo modprobe tun
+    
+    # Verify TUN device exists
+    ls -l /dev/net/tun
+    ```
+  </Accordion>
+
+  <Accordion title="Debug logs">
+    Enable debug logging:
+    ```bash
+    netbird service stop
+    netbird service install --service-env="NB_LOG_LEVEL=debug"
+    netbird service start
+    
+    # View logs
+    tail -f /var/log/netbird/client.log
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Updating NetBird
+
+<Tabs>
+  <Tab title="APT (Debian/Ubuntu)">
+    ```bash
+    sudo apt-get update
+    sudo apt-get upgrade netbird netbird-ui
+    ```
+  </Tab>
+
+  <Tab title="DNF (Fedora)">
+    ```bash
+    sudo dnf upgrade netbird netbird-ui
+    ```
+  </Tab>
+
+  <Tab title="YUM (CentOS/RHEL)">
+    ```bash
+    sudo yum update netbird netbird-ui
+    ```
+  </Tab>
+
+  <Tab title="Binary Installation">
+    ```bash
+    export UPDATE_NETBIRD=true
+    curl -fsSL https://pkgs.netbird.io/install.sh | sh
+    ```
+  </Tab>
+</Tabs>
+
+## Uninstalling
+
+<Steps>
+  <Step title="Stop and uninstall the service">
+    ```bash
+    netbird service stop
+    netbird service uninstall
+    ```
+  </Step>
+
+  <Step title="Remove packages">
+    <Tabs>
+      <Tab title="APT">
+        ```bash
+        sudo apt-get remove --purge netbird netbird-ui
+        sudo rm -rf /etc/netbird /var/log/netbird
+        ```
+      </Tab>
+
+      <Tab title="DNF/YUM">
+        ```bash
+        sudo dnf remove netbird netbird-ui
+        # or
+        sudo yum remove netbird netbird-ui
+        
+        sudo rm -rf /etc/netbird /var/log/netbird
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+</Steps>
